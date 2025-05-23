@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 
 function App() {
@@ -13,6 +13,50 @@ function App() {
   const [pdfInfo, setPdfInfo] = useState(null);
   const [pageLoadingStates, setPageLoadingStates] = useState([]);
   const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
+  const [currentVisiblePage, setCurrentVisiblePage] = useState(0);
+  const carouselRef = useRef(null);
+
+  // Intersection Observer to track which page is currently visible
+  useEffect(() => {
+    if (!carouselRef.current || imageResults.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let maxVisibleRatio = 0;
+        let mostVisibleIndex = 0;
+
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > maxVisibleRatio) {
+            maxVisibleRatio = entry.intersectionRatio;
+            mostVisibleIndex = parseInt(entry.target.dataset.pageIndex);
+          }
+        });
+
+        if (maxVisibleRatio > 0.3) { // Only update if at least 30% visible
+          setCurrentVisiblePage(mostVisibleIndex);
+        }
+      },
+      {
+        root: carouselRef.current,
+        threshold: [0, 0.3, 0.5, 0.7, 1.0]
+      }
+    );
+
+    const imageContainers = carouselRef.current.querySelectorAll('.image-container');
+    imageContainers.forEach((container) => observer.observe(container));
+
+    return () => observer.disconnect();
+  }, [imageResults.length]);
+
+  const scrollToPage = useCallback((pageIndex) => {
+    const container = carouselRef.current?.querySelector(`[data-page-index="${pageIndex}"]`);
+    if (container) {
+      container.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -410,9 +454,9 @@ function App() {
             </div>
           )} */}
           
-          <div className="image-carousel">
+          <div className="image-carousel" ref={carouselRef}>
             {imageResults.map((img, idx) => (
-              <div key={idx} className="image-container">
+              <div key={idx} className="image-container" data-page-index={idx}>
                 {pageLoadingStates[idx] === true ? (
                   <div style={{
                     display: 'flex',
@@ -623,14 +667,55 @@ function App() {
               </div>
             ))}
           </div>
-          <div style={{ 
+          
+          {/* Floating Page Navigation */}
+          {imageResults.filter(img => img !== null).length > 1 && (
+            <div className="floating-page-nav">
+              <div className="page-nav-content">
+                <span className="current-page-indicator">
+                  Page {currentVisiblePage + 1} of {pdfInfo?.page_count || imageResults.length}
+                </span>
+                <div className="page-nav-buttons">
+                  <button 
+                    className="nav-button" 
+                    onClick={() => scrollToPage(Math.max(0, currentVisiblePage - 1))}
+                    disabled={currentVisiblePage === 0}
+                  >
+                    ←
+                  </button>
+                  <select 
+                    value={currentVisiblePage} 
+                    onChange={(e) => scrollToPage(parseInt(e.target.value))}
+                    className="page-select"
+                  >
+                    {imageResults.map((_, idx) => (
+                      imageResults[idx] && (
+                        <option key={idx} value={idx}>
+                          Page {idx + 1}
+                        </option>
+                      )
+                    ))}
+                  </select>
+                  <button 
+                    className="nav-button" 
+                    onClick={() => scrollToPage(Math.min(imageResults.length - 1, currentVisiblePage + 1))}
+                    disabled={currentVisiblePage === imageResults.length - 1}
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* <div style={{ 
             textAlign: 'center',
             marginTop: '1rem' 
           }}>
             <button onClick={clearResults} className="clear-button">
               Clear Results
             </button>
-          </div>
+          </div> */}
         </div>
       )}
     </div>

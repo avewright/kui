@@ -230,6 +230,7 @@ button {
 
 /* Image results styling */
 .image-results {
+  position: relative;
   margin-top: 3.5rem;
   max-width: 100%;
   padding: 1.5rem;
@@ -240,33 +241,60 @@ button {
 
 .image-carousel {
   height: auto;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
-  scroll-snap-type: y mandatory;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 3rem;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for image carousel */
+.image-carousel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.image-carousel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.image-carousel::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.image-carousel::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}
+
+/* For Firefox */
+.image-carousel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) rgba(0, 0, 0, 0.05);
 }
 
 .App.with-images .image-carousel {
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 80px);
 }
 
 .image-container {
   width: 100%;
   max-width: 800px;
-  scroll-snap-align: center;
   padding: 1.5rem;
   background: white;
   border-radius: var(--radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .image-container:hover {
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
 .page-number {
@@ -550,4 +578,121 @@ button {
 
 .verify-button:hover {
   background-color: var(--success-dark);
+}
+
+/* Floating Page Navigation */
+.floating-page-nav {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  width: fit-content;
+}
+
+.page-nav-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  backdrop-filter: blur(10px);
+  font-size: 0.85rem;
+}
+
+.current-page-indicator {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  white-space: nowrap;
+}
+
+.page-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nav-button {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+}
+
+.nav-button:disabled {
+  background: var(--text-light);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.page-select {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  color: var(--text-dark);
+  font-size: 0.75rem;
+  cursor: pointer;
+  min-width: 70px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.page-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .floating-page-nav {
+    position: static;
+    margin: 1rem auto 0;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .page-nav-content {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    gap: 0.5rem;
+  }
+  
+  .current-page-indicator {
+    font-size: 0.75rem;
+  }
+  
+  .nav-button {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  
+  .page-select {
+    min-width: 75px;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.75rem;
+  }
+  
+  /* Adjust image results padding on mobile to account for nav */
+  .image-results {
+    padding-top: 1rem;
+  }
 }
