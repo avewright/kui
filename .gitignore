@@ -37,6 +37,7 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+<<<<<<< HEAD
 lerna-debug.log*
 
 # Runtime data
@@ -78,3 +79,21 @@ temp/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/ 
+=======
+yarn.lock
+package-lock.json
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+build/
+coverage/
+.idea/
+.vscode/
+*.log
+*.swp
+*.swo
+.DS_Store
+.venv/
+>>>>>>> 5dded7d2590a453b61e56a70e81a72d1b05f5677
