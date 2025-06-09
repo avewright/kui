@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import logo from './logo.png'; // Import the logo
 
@@ -24,15 +24,7 @@ function App() {
     }
   }, [imageResults.length]);
 
-  const scrollToPage = useCallback((pageIndex) => {
-    const container = carouselRef.current?.querySelector(`[data-page-index="${pageIndex}"]`);
-    if (container) {
-      container.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
-    }
-  }, []);
+
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -74,7 +66,7 @@ function App() {
 
   const fetchPageImage = async (pdfId, pageNumber) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/pdf_page/${pdfId}/${pageNumber}`);
+      const response = await fetch(`http://127.0.0.1:8080/pdf_page/${pdfId}/${pageNumber}`);
       
       if (!response.ok) {
         throw new Error(`Failed to load page ${pageNumber + 1}`);
@@ -88,6 +80,8 @@ function App() {
     }
   };
 
+  const [aiProcessingId, setAiProcessingId] = useState(null);
+
   const uploadFileToAPI = async () => {
     if (!file) return;
   
@@ -100,10 +94,18 @@ function App() {
     setPdfInfo(null);
     setPageLoadingStates([]);
     setLoadingProgress({ loaded: 0, total: 0 });
+    setAiProcessingId(null);
   
     try {
-      // First, get PDF info (page count and PDF ID)
-      const infoResponse = await fetch('http://127.0.0.1:8000/pdf_info', {
+      // Start AI sequential processing first
+      console.log("🚀 Starting AI sequential processing...");
+      const aiStartResponse = await fetch('http://127.0.0.1:8080/ai_metadata/start', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Also get basic PDF info for image conversion
+      const infoResponse = await fetch('http://127.0.0.1:8080/pdf_info', {
         method: 'POST',
         body: formData,
       });
@@ -116,6 +118,19 @@ function App() {
       const info = await infoResponse.json();
       setPdfInfo(info);
       
+      // Get AI processing ID and first page metadata
+      let firstPageAiData = null;
+      let processingId = null;
+      if (aiStartResponse.ok) {
+        const aiStartData = await aiStartResponse.json();
+        processingId = aiStartData.processing_id;
+        firstPageAiData = aiStartData.result;
+        setAiProcessingId(processingId);
+        console.log("AI processing started:", aiStartData);
+      } else {
+        console.warn("AI metadata extraction failed to start, will use fallback data");
+      }
+      
       // Initialize arrays for the expected number of pages
       const initialResults = new Array(info.page_count).fill(null);
       const initialMetadata = new Array(info.page_count).fill(null);
@@ -126,74 +141,15 @@ function App() {
       setPageLoadingStates(initialLoadingStates);
       setLoadingProgress({ loaded: 0, total: info.page_count });
 
-      // Create promises for all pages
-      const pagePromises = Array.from({ length: info.page_count }, (_, pageIndex) => 
-        fetchPageImage(info.pdf_id, pageIndex)
-          .then(pageData => {
-            // Update the specific page when it completes
-            setImageResults(prev => {
-              const updated = [...prev];
-              updated[pageIndex] = pageData.image;
-              return updated;
-            });
+      // Load first page immediately with AI data
+      if (firstPageAiData) {
+        console.log("📄 Loading first page with AI data...");
+        await loadPageWithData(info.pdf_id, 0, firstPageAiData);
+      }
 
-            // Generate metadata for this page
-            const dummyMetadata = {
-              title: `Drawing Title ${pageIndex + 1}`,
-              drawingNumber: `DWG-${10000 + pageIndex}`,
-              revisions: [
-                {
-                  id: `REV-${pageIndex + 1}-001`,
-                  description: `Initial release`,
-                  date: new Date().toISOString().split('T')[0]
-                }
-              ],
-              isEdited: false
-            };
-
-            setMetadata(prev => {
-              const updated = [...prev];
-              updated[pageIndex] = dummyMetadata;
-              return updated;
-            });
-
-            // Update loading state for this page
-            setPageLoadingStates(prev => {
-              const updated = [...prev];
-              updated[pageIndex] = false;
-              return updated;
-            });
-
-            // Update progress
-            setLoadingProgress(prev => ({
-              loaded: prev.loaded + 1,
-              total: prev.total
-            }));
-
-            return pageData;
-          })
-          .catch(error => {
-            console.error(`Failed to load page ${pageIndex + 1}:`, error);
-            
-            // Mark this page as failed
-            setPageLoadingStates(prev => {
-              const updated = [...prev];
-              updated[pageIndex] = 'error';
-              return updated;
-            });
-
-            // Still update progress count
-            setLoadingProgress(prev => ({
-              loaded: prev.loaded + 1,
-              total: prev.total
-            }));
-
-            return null;
-          })
-      );
-
-      // Wait for all pages to complete (or fail)
-      await Promise.allSettled(pagePromises);
+      // Start background loading of remaining pages
+      console.log(`📚 Starting background loading of ${info.page_count - 1} remaining pages...`);
+      loadRemainingPagesSequentially(info.pdf_id, info.page_count, processingId);
 
     } catch (error) {
       console.error("Upload error:", error);
@@ -203,10 +159,163 @@ function App() {
     }
   };
 
+  const fetchAiMetadataForPage = async (processingId, pageNumber) => {
+    if (!processingId) return null;
+    
+    // Retry logic for getting AI metadata
+    const maxRetries = 8; // Reduced retries to fail faster
+    const retryDelay = 3000; // 3 seconds between retries
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(`http://127.0.0.1:8080/ai_metadata/${processingId}/${pageNumber}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ AI metadata loaded for page ${pageNumber}`);
+          return data.result;
+        } else if (response.status === 404) {
+          // Page not ready yet, wait and retry
+          console.log(`⏳ Page ${pageNumber} not ready yet, attempt ${attempt + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        } else if (response.status === 422) {
+          // AI model error - don't retry, fall back immediately
+          const errorData = await response.json();
+          console.warn(`❌ AI model failed for page ${pageNumber}:`, errorData.detail);
+          return null;
+        } else if (response.status === 408 || response.status === 503) {
+          // Timeout or service unavailable - try a few more times
+          console.warn(`⚠️ AI service issue for page ${pageNumber}: ${response.status}, attempt ${attempt + 1}/${maxRetries}`);
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          return null;
+        } else {
+          console.warn(`❌ Unexpected error for page ${pageNumber}: ${response.status}`);
+          return null;
+        }
+      } catch (error) {
+        console.warn(`🔗 Network error fetching AI metadata for page ${pageNumber}, attempt ${attempt + 1}:`, error);
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+    }
+    
+    console.warn(`❌ Failed to get AI metadata for page ${pageNumber} after ${maxRetries} attempts - using fallback data`);
+    return null;
+  };
+
+  const loadPageWithData = async (pdfId, pageIndex, aiData) => {
+    try {
+      // Get the image for this page
+      const pageData = await fetchPageImage(pdfId, pageIndex);
+      
+      // Update the image
+      setImageResults(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = pageData.image;
+        return updated;
+      });
+
+      // Process AI metadata for this specific page
+      let pageMetadata;
+      if (aiData) {
+        // Convert AI response format to our internal format
+        pageMetadata = {
+          title: aiData.drawing_title || ``,
+          drawingNumber: aiData.drawing_number || ``,
+          revisions: aiData.revision_history ? aiData.revision_history.map((rev, idx) => ({
+            id: `REV-${pageIndex + 1}-${String(idx + 1).padStart(3, '0')}`,
+            description: rev.revision_description || 'No description',
+            date: rev.revision_date || new Date().toISOString().split('T')[0]
+          })) : [],
+          isEdited: false,
+          isAiGenerated: true
+        };
+      } else {
+        // Fallback to dummy data
+        pageMetadata = {
+          title: ``,
+          drawingNumber: ``,
+          revisions: [],
+          isEdited: false,
+          isAiGenerated: false
+        };
+      }
+
+      setMetadata(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = pageMetadata;
+        return updated;
+      });
+
+      // Update loading state for this page
+      setPageLoadingStates(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = false;
+        return updated;
+      });
+
+      // Update progress
+      setLoadingProgress(prev => ({
+        loaded: prev.loaded + 1,
+        total: prev.total
+      }));
+
+      console.log(`✅ Page ${pageIndex + 1} loaded successfully`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to load page ${pageIndex + 1}:`, error);
+      
+      // Mark this page as failed
+      setPageLoadingStates(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = 'error';
+        return updated;
+      });
+
+      // Still update progress count
+      setLoadingProgress(prev => ({
+        loaded: prev.loaded + 1,
+        total: prev.total
+      }));
+    }
+  };
+
+  const loadRemainingPagesSequentially = async (pdfId, totalPages, aiProcessingId) => {
+    // Process pages 2 onwards
+    for (let pageIndex = 1; pageIndex < totalPages; pageIndex++) {
+      const pageNumber = pageIndex + 1;
+      
+      try {
+        console.log(`🔄 Processing page ${pageNumber}...`);
+        
+        // Get AI metadata for this page (with proper retry logic)
+        const aiData = await fetchAiMetadataForPage(aiProcessingId, pageNumber);
+        
+        // Load the page with the AI data (or fallback)
+        await loadPageWithData(pdfId, pageIndex, aiData);
+        
+        // Small delay between pages to not overwhelm the system
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        console.error(`❌ Error processing page ${pageNumber}:`, error);
+        // Continue with next page even if this one fails
+        await loadPageWithData(pdfId, pageIndex, null);
+      }
+    }
+    
+    console.log("🎉 All pages processing completed!");
+  };
+
   const cleanupPdf = async () => {
     if (pdfInfo?.pdf_id) {
       try {
-        await fetch(`http://127.0.0.1:8000/pdf/${pdfInfo.pdf_id}`, {
+        await fetch(`http://127.0.0.1:8080/pdf/${pdfInfo.pdf_id}`, {
           method: 'DELETE'
         });
       } catch (error) {
@@ -319,7 +428,7 @@ function App() {
       <div className="container">
         {/* <div className="logo-container">
         </div> */}
-        <h1><img src={logo} className="kahua-logo" style={{width: "66%", height: "66%"}} /></h1>
+        <h1><img src={logo} className="kahua-logo" style={{width: "66%", height: "66%"}} alt="Kahua Logo" /></h1>
         <div 
           className={`upload-area ${isDragging ? 'dragging' : ''}`}
           onDragOver={handleDragOver}
