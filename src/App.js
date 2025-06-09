@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
+import logo from './logo.png'; // Import the logo
 
 function App() {
   const [file, setFile] = useState(null);
@@ -16,36 +17,11 @@ function App() {
   const [currentVisiblePage, setCurrentVisiblePage] = useState(0);
   const carouselRef = useRef(null);
 
-  // Intersection Observer to track which page is currently visible
+  // Reset current page when new images load
   useEffect(() => {
-    if (!carouselRef.current || imageResults.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let maxVisibleRatio = 0;
-        let mostVisibleIndex = 0;
-
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio > maxVisibleRatio) {
-            maxVisibleRatio = entry.intersectionRatio;
-            mostVisibleIndex = parseInt(entry.target.dataset.pageIndex);
-          }
-        });
-
-        if (maxVisibleRatio > 0.3) { // Only update if at least 30% visible
-          setCurrentVisiblePage(mostVisibleIndex);
-        }
-      },
-      {
-        root: carouselRef.current,
-        threshold: [0, 0.3, 0.5, 0.7, 1.0]
-      }
-    );
-
-    const imageContainers = carouselRef.current.querySelectorAll('.image-container');
-    imageContainers.forEach((container) => observer.observe(container));
-
-    return () => observer.disconnect();
+    if (imageResults.length > 0) {
+      setCurrentVisiblePage(0);
+    }
   }, [imageResults.length]);
 
   const scrollToPage = useCallback((pageIndex) => {
@@ -320,10 +296,30 @@ function App() {
     setError(null);
   };
 
+  const goToNextPage = () => {
+    if (currentVisiblePage < imageResults.length - 1) {
+      setCurrentVisiblePage(prev => prev + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentVisiblePage > 0) {
+      setCurrentVisiblePage(prev => prev - 1);
+    }
+  };
+
+  const goToPage = (pageIndex) => {
+    if (pageIndex >= 0 && pageIndex < imageResults.length) {
+      setCurrentVisiblePage(pageIndex);
+    }
+  };
+
   return (
     <div className={`App ${imageResults.length > 0 ? 'with-images' : ''}`}>
       <div className="container">
-        <h1>PDF Uploader</h1>
+        {/* <div className="logo-container">
+        </div> */}
+        <h1><img src={logo} className="kahua-logo" style={{width: "66%", height: "66%"}} /></h1>
         <div 
           className={`upload-area ${isDragging ? 'dragging' : ''}`}
           onDragOver={handleDragOver}
@@ -372,7 +368,7 @@ function App() {
           </div>
         </div>
         
-        {file && (
+        {file && imageResults.length === 0 && (
           <div className="action-buttons">
             <button 
               className="upload-button" 
@@ -391,12 +387,28 @@ function App() {
           </div>
         )}
         
+        {/* Action buttons for when images are loaded */}
+        {imageResults.length > 0 && (
+          <div className="loaded-state-actions">
+            <button 
+              className="upload-button" 
+              onClick={uploadFileToAPI}
+              disabled={isUploading}
+            >
+              {isUploading ? 'Processing...' : 'Convert to Images'}
+            </button>
+            <button className="clear-button" onClick={clearResults}>
+              Clear Results
+            </button>
+          </div>
+        )}
+        
         {isUploading && pdfInfo && (
           <div className="loading-indicator" style={{
             marginTop: '2rem',
             textAlign: 'center'
           }}>
-            <p>Processing PDF: {pdfInfo.filename}</p>
+            {/* <p>Processing PDF: {pdfInfo.filename}</p> */}
             <p>Pages loaded: {loadingProgress.loaded} of {loadingProgress.total}</p>
             <div className="progress-bar" style={{
               width: '100%',
@@ -413,51 +425,19 @@ function App() {
                 transition: 'width 0.3s ease'
               }}></div>
             </div>
-            <div className="spinner"></div>
+            {/* <div className="spinner"></div> */}
           </div>
         )}
       </div>
       {imageResults.length > 0 && (
         <div className="image-results">
-          <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>
-            {pdfInfo ? `${pdfInfo.filename} (${imageResults.filter(img => img !== null).length}/${pdfInfo.page_count} pages loaded)` : 'PDF Preview'}
-          </h2>
-          
-          {/* {metadata.some(item => item.isEdited) && (
-            <div className="metadata-summary">
-              <div className="summary-header">
-                <h3>Edited Fields Summary</h3>
-                <span className="edit-count">
-                  {metadata.filter(item => item.isEdited).length} of {metadata.length} pages edited
-                </span>
-              </div>
-              <div className="summary-content">
-                <p>
-                  The following fields have been manually corrected:
-                </p>
-                <ul className="edit-list">
-                  {metadata.map((item, idx) => 
-                    item.isEdited && (
-                      <li key={idx}>
-                        <span className="page-badge">Page {idx + 1}</span>
-                        {item.title && <span className="field-badge">Title</span>}
-                        {item.drawingNumber && <span className="field-badge">Drawing #</span>}
-                        {item.revisions && <span className="field-badge">Revisions</span>}
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
-              <div className="summary-actions">
-                <button className="verify-button">Verify All Changes</button>
-              </div>
-            </div>
-          )} */}
+          {/* Remove the action buttons from here */}
           
           <div className="image-carousel" ref={carouselRef}>
-            {imageResults.map((img, idx) => (
-              <div key={idx} className="image-container" data-page-index={idx}>
-                {pageLoadingStates[idx] === true ? (
+            {/* Show only the current page */}
+            {imageResults[currentVisiblePage] !== undefined && (
+              <div className="image-container" data-page-index={currentVisiblePage}>
+                {pageLoadingStates[currentVisiblePage] === true ? (
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -467,9 +447,9 @@ function App() {
                     justifyContent: 'center'
                   }}>
                     <div className="spinner" style={{ marginBottom: '1rem' }}></div>
-                    <p>Loading page {idx + 1}...</p>
+                    <p>Loading page {currentVisiblePage + 1}...</p>
                   </div>
-                ) : pageLoadingStates[idx] === 'error' ? (
+                ) : pageLoadingStates[currentVisiblePage] === 'error' ? (
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -485,32 +465,32 @@ function App() {
                       <line x1="15" y1="9" x2="9" y2="15"></line>
                       <line x1="9" y1="9" x2="15" y2="15"></line>
                     </svg>
-                    <p style={{ color: 'var(--danger)' }}>Failed to load page {idx + 1}</p>
+                    <p style={{ color: 'var(--danger)' }}>Failed to load page {currentVisiblePage + 1}</p>
                     <button 
                       className="small-button" 
                       onClick={() => {
                         setPageLoadingStates(prev => {
                           const updated = [...prev];
-                          updated[idx] = true;
+                          updated[currentVisiblePage] = true;
                           return updated;
                         });
-                        fetchPageImage(pdfInfo.pdf_id, idx)
+                        fetchPageImage(pdfInfo.pdf_id, currentVisiblePage)
                           .then(pageData => {
                             setImageResults(prev => {
                               const updated = [...prev];
-                              updated[idx] = pageData.image;
+                              updated[currentVisiblePage] = pageData.image;
                               return updated;
                             });
                             setPageLoadingStates(prev => {
                               const updated = [...prev];
-                              updated[idx] = false;
+                              updated[currentVisiblePage] = false;
                               return updated;
                             });
                           })
                           .catch(() => {
                             setPageLoadingStates(prev => {
                               const updated = [...prev];
-                              updated[idx] = 'error';
+                              updated[currentVisiblePage] = 'error';
                               return updated;
                             });
                           });
@@ -519,12 +499,12 @@ function App() {
                       Retry
                     </button>
                   </div>
-                ) : img ? (
+                ) : imageResults[currentVisiblePage] ? (
                   <>
                     <div className="image-wrapper">
                       <img 
-                        src={`data:image/png;base64,${img}`} 
-                        alt={`Page ${idx + 1}`}
+                        src={`data:image/png;base64,${imageResults[currentVisiblePage]}`} 
+                        alt={`Page ${currentVisiblePage + 1}`}
                         loading="lazy"
                         style={{
                           width: '100%',
@@ -533,31 +513,31 @@ function App() {
                       />
                     </div>
                     
-                    {metadata[idx] && (
+                    {metadata[currentVisiblePage] && (
                       <div className="metadata-panel">
                         <div className="metadata-header">
                           <h3>Metadata</h3>
-                          {editingIndex === idx ? (
+                          {editingIndex === currentVisiblePage ? (
                             <button className="small-button" onClick={stopEditing}>Done</button>
                           ) : (
-                            <button className="small-button" onClick={() => startEditing(idx)}>Edit</button>
+                            <button className="small-button" onClick={() => startEditing(currentVisiblePage)}>Edit</button>
                           )}
                         </div>
                         
                         <div className="metadata-content">
                           <div className="metadata-field">
                             <label>Title</label>
-                            {editingIndex === idx ? (
+                            {editingIndex === currentVisiblePage ? (
                               <input
                                 type="text"
-                                value={metadata[idx]?.title || ''}
-                                onChange={(e) => handleMetadataEdit(idx, 'title', e.target.value)}
+                                value={metadata[currentVisiblePage]?.title || ''}
+                                onChange={(e) => handleMetadataEdit(currentVisiblePage, 'title', e.target.value)}
                                 className="metadata-input"
                               />
                             ) : (
                               <div className="metadata-value-container">
-                                <p className={metadata[idx]?.isEdited ? 'edited-value' : ''}>
-                                  {metadata[idx]?.title || 'Unknown Title'}
+                                <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                  {metadata[currentVisiblePage]?.title || 'Unknown Title'}
                                 </p>
                               </div>
                             )}
@@ -565,17 +545,17 @@ function App() {
                           
                           <div className="metadata-field">
                             <label>Drawing Number</label>
-                            {editingIndex === idx ? (
+                            {editingIndex === currentVisiblePage ? (
                               <input
                                 type="text"
-                                value={metadata[idx]?.drawingNumber || ''}
-                                onChange={(e) => handleMetadataEdit(idx, 'drawingNumber', e.target.value)}
+                                value={metadata[currentVisiblePage]?.drawingNumber || ''}
+                                onChange={(e) => handleMetadataEdit(currentVisiblePage, 'drawingNumber', e.target.value)}
                                 className="metadata-input"
                               />
                             ) : (
                               <div className="metadata-value-container">
-                                <p className={metadata[idx]?.isEdited ? 'edited-value' : ''}>
-                                  {metadata[idx]?.drawingNumber || 'Unknown Number'}
+                                <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                  {metadata[currentVisiblePage]?.drawingNumber || 'Unknown Number'}
                                 </p>
                               </div>
                             )}
@@ -583,7 +563,7 @@ function App() {
                           
                           <div className="metadata-field">
                             <label>Revisions</label>
-                            {editingIndex === idx ? (
+                            {editingIndex === currentVisiblePage ? (
                               <div className="revision-table">
                                 <div className="revision-row">
                                   <div className="revision-cell">ID</div>
@@ -591,13 +571,13 @@ function App() {
                                   <div className="revision-cell">Date</div>
                                   <div className="revision-cell">Actions</div>
                                 </div>
-                                {metadata[idx].revisions.map((revision, revisionIndex) => (
+                                {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
                                   <div key={revisionIndex} className="revision-row">
                                     <div className="revision-cell">
                                       <input
                                         type="text"
                                         value={revision.id}
-                                        onChange={(e) => handleRevisionEdit(idx, revisionIndex, 'id', e.target.value)}
+                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'id', e.target.value)}
                                         className="revision-input"
                                       />
                                     </div>
@@ -605,7 +585,7 @@ function App() {
                                       <input
                                         type="text"
                                         value={revision.description}
-                                        onChange={(e) => handleRevisionEdit(idx, revisionIndex, 'description', e.target.value)}
+                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'description', e.target.value)}
                                         className="revision-input"
                                       />
                                     </div>
@@ -613,7 +593,7 @@ function App() {
                                       <input
                                         type="date"
                                         value={revision.date}
-                                        onChange={(e) => handleRevisionEdit(idx, revisionIndex, 'date', e.target.value)}
+                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'date', e.target.value)}
                                         className="revision-input"
                                       />
                                     </div>
@@ -621,7 +601,7 @@ function App() {
                                       <button 
                                         className="small-button" 
                                         style={{ backgroundColor: 'var(--danger)' }}
-                                        onClick={() => removeRevisionRow(idx, revisionIndex)}
+                                        onClick={() => removeRevisionRow(currentVisiblePage, revisionIndex)}
                                       >
                                         Remove
                                       </button>
@@ -629,7 +609,7 @@ function App() {
                                   </div>
                                 ))}
                                 <div className="revision-actions" style={{ marginTop: '0.5rem' }}>
-                                  <button className="small-button" onClick={() => addRevisionRow(idx)}>Add Revision</button>
+                                  <button className="small-button" onClick={() => addRevisionRow(currentVisiblePage)}>Add Revision</button>
                                 </div>
                               </div>
                             ) : (
@@ -639,7 +619,7 @@ function App() {
                                   <div className="revision-cell">Description</div>
                                   <div className="revision-cell">Date</div>
                                 </div>
-                                {metadata[idx].revisions.map((revision, revisionIndex) => (
+                                {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
                                   <div key={revisionIndex} className="revision-row">
                                     <div className="revision-cell">
                                       <p>{revision.id}</p>
@@ -659,63 +639,81 @@ function App() {
                       </div>
                     )}
                     
-                    <p className="page-number">
-                      Page {idx + 1}
-                    </p>
+                    {/* <p className="page-number">
+                      Page {currentVisiblePage + 1}
+                    </p> */}
                   </>
                 ) : null}
               </div>
-            ))}
+            )}
+            
+            {/* Navigation Controls */}
+            {imageResults.length > 1 && (
+              <div className="carousel-navigation">
+                <button 
+                  className="nav-arrow nav-arrow-left" 
+                  onClick={goToPreviousPage}
+                  disabled={currentVisiblePage === 0}
+                  title="Previous page"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                
+                <button 
+                  className="nav-arrow nav-arrow-right" 
+                  onClick={goToNextPage}
+                  disabled={currentVisiblePage === imageResults.length - 1}
+                  title="Next page"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Floating Page Navigation */}
           {imageResults.filter(img => img !== null).length > 1 && (
             <div className="floating-page-nav">
-              <div className="page-nav-content">
-                <span className="current-page-indicator">
+              {/* <div className="page-nav-content"> */}
+                {/* <span className="current-page-indicator">
                   Page {currentVisiblePage + 1} of {pdfInfo?.page_count || imageResults.length}
-                </span>
+                </span> */}
                 <div className="page-nav-buttons">
-                  <button 
+                  {/* <button 
                     className="nav-button" 
-                    onClick={() => scrollToPage(Math.max(0, currentVisiblePage - 1))}
+                    onClick={goToPreviousPage}
                     disabled={currentVisiblePage === 0}
                   >
                     ←
-                  </button>
+                  </button> */}
                   <select 
                     value={currentVisiblePage} 
-                    onChange={(e) => scrollToPage(parseInt(e.target.value))}
+                    onChange={(e) => goToPage(parseInt(e.target.value))}
                     className="page-select"
                   >
                     {imageResults.map((_, idx) => (
                       imageResults[idx] && (
                         <option key={idx} value={idx}>
-                          Page {idx + 1}
+                          Page {idx + 1} of {imageResults.length}
                         </option>
                       )
                     ))}
                   </select>
-                  <button 
+                  {/* <button 
                     className="nav-button" 
-                    onClick={() => scrollToPage(Math.min(imageResults.length - 1, currentVisiblePage + 1))}
+                    onClick={goToNextPage}
                     disabled={currentVisiblePage === imageResults.length - 1}
                   >
                     →
-                  </button>
+                  </button> */}
                 </div>
               </div>
-            </div>
+            // </div>
           )}
-          
-          {/* <div style={{ 
-            textAlign: 'center',
-            marginTop: '1rem' 
-          }}>
-            <button onClick={clearResults} className="clear-button">
-              Clear Results
-            </button>
-          </div> */}
         </div>
       )}
     </div>
