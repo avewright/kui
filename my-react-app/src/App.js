@@ -225,12 +225,12 @@ function App() {
       if (aiData) {
         // Convert AI response format to our internal format
         pageMetadata = {
-          title: aiData.drawing_title || ``,
-          drawingNumber: aiData.drawing_number || ``,
+          title: aiData.drawing_title || '',
+          drawingNumber: aiData.drawing_number || '',
           revisions: aiData.revision_history ? aiData.revision_history.map((rev, idx) => ({
-            id: `REV-${pageIndex + 1}-${String(idx + 1).padStart(3, '0')}`,
-            description: rev.revision_description || 'No description',
-            date: rev.revision_date || new Date().toISOString().split('T')[0]
+            id: rev.revision_id || '',
+            description: rev.revision_description || '',
+            date: rev.revision_date || ''
           })) : [],
           isEdited: false,
           isAiGenerated: true
@@ -484,7 +484,7 @@ function App() {
               onClick={uploadFileToAPI}
               disabled={isUploading}
             >
-              {isUploading ? 'Processing...' : 'Convert to Images'}
+              {isUploading ? 'Processing...' : 'Extract Metadata'}
             </button>
             <button className="clear-button" onClick={clearFile}>Clear</button>
           </div>
@@ -504,7 +504,7 @@ function App() {
               onClick={uploadFileToAPI}
               disabled={isUploading}
             >
-              {isUploading ? 'Processing...' : 'Convert to Images'}
+              {isUploading ? 'Processing...' : 'Extract Metadata'}
             </button>
             <button className="clear-button" onClick={clearResults}>
               Clear Results
