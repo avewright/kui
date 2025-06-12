@@ -1,71 +1,132 @@
-# PDF Viewer Application
+# 🚀 Simple vLLM Document Extraction
 
-A full-stack application for uploading and viewing PDF files, featuring a FastAPI backend and React frontend.
+A clean, modern document extraction system with vLLM vision models and React.
 
-## Features
+## 📁 Project Structure (Simple!)
 
-- Upload PDFs via drag and drop
-- View PDFs page by page
-- Responsive design
+```
+├── api/                 # Backend FastAPI server
+│   ├── main.py         # Main API code
+│   ├── requirements.txt # Python dependencies
+│   └── Dockerfile      # For Docker deployment
+├── frontend/            # React web interface
+│   ├── src/            # React components & code
+│   ├── package.json    # Node.js dependencies
+│   └── Dockerfile      # For Docker deployment
+├── vllm/               # Vision model deployment
+│   ├── deploy.py       # Deploy vision models
+│   └── config.yaml     # Model configuration
+├── scripts/            # Easy deployment scripts
+│   ├── setup.sh        # One-time setup
+│   └── start.sh        # Start everything
+├── docker-compose.yml  # Run everything with Docker
+└── README.md          # This file
+```
 
-## Project Structure
+**That's it!** Only 4 main folders you need to care about.
 
-- `/backend` - FastAPI backend for handling file uploads and serving PDF pages
-- `/frontend` - React frontend for user interaction and PDF viewing
+## 🎯 What Each Folder Does
 
-## Getting Started
+| Folder | Purpose | You Need This If... |
+|--------|---------|---------------------|
+| `api/` | Handles PDF processing and talks to AI models | Always (this is the backend) |
+| `frontend/` | The website you see in your browser | Always (this is the UI) |
+| `vllm/` | Deploys AI vision models for document reading | You want to run AI models locally |
+| `scripts/` | Makes setup and starting easy | You want simple commands |
 
-### Backend Setup
+## 🚀 Super Easy Deployment
 
-1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
+### Option 1: Automatic Setup (Recommended)
+```bash
+# Setup everything once
+./scripts/setup.sh
 
-2. Create a virtual environment (recommended):
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Start everything
+./scripts/start.sh
+```
+**Done!** Go to http://localhost:3000
 
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+### Option 2: Docker (Even Easier)
+```bash
+# Start everything with one command
+docker-compose up
+```
+**Done!** Go to http://localhost:3000
 
-4. Start the FastAPI server:
-   ```
-   uvicorn main:app --reload
-   ```
+### Option 3: Manual (If you want control)
+```bash
+# 1. Start the AI model server
+cd vllm
+python deploy.py --model llava-1.5-7b
 
-The backend will start at http://localhost:8000.
+# 2. Start the backend (new terminal)
+cd api
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
 
-### Frontend Setup
+# 3. Start the frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+```
 
-1. Navigate to the frontend directory:
-   ```
-   cd frontend
-   ```
+## 🎮 How to Use
 
-2. Install dependencies:
-   ```
-   npm install
-   ```
+1. **Open your browser** → http://localhost:3000
+2. **Upload a PDF** → Drag & drop or click to select
+3. **Configure fields** → Tell it what to extract (title, date, etc.)
+4. **Click Process** → Watch it extract data using AI
+5. **Download results** → Get JSON with extracted data
 
-3. Start the React development server:
-   ```
-   npm start
-   ```
+## 🔧 Configuration
 
-The frontend will start at http://localhost:3000.
+### Change AI Model
+Edit `vllm/config.yaml`:
+```yaml
+model: "llava-hf/llava-1.5-13b-hf"  # Use bigger model
+gpu_memory_utilization: 0.95        # Use more GPU memory
+```
 
-## Usage
+### Change Ports
+Edit `api/.env`:
+```
+VLLM_ENDPOINT=http://localhost:8000
+API_PORT=8080
+```
 
-1. Open your browser and go to http://localhost:3000
-2. Upload a PDF by dragging and dropping it onto the upload area
-3. Use the navigation buttons to browse through the PDF pages
+Edit `frontend/.env`:
+```
+REACT_APP_API_URL=http://localhost:8080
+```
 
-## Technologies Used
+## 🛠️ Requirements
 
-- **Backend**: FastAPI, PyPDF2
-- **Frontend**: React, React PDF, React Dropzone, Axios 
+- **Python 3.8+** (for AI models)
+- **Node.js 18+** (for web interface)
+- **GPU** (optional, for local AI models)
+- **Docker** (optional, for easy deployment)
+
+## ❓ Need Help?
+
+**Model won't start?** Check if you have enough GPU memory (8GB+ recommended)
+
+**Can't access website?** Make sure ports 3000, 8080, and 8000 aren't in use
+
+**Extraction not working?** Check that vLLM server is running at http://localhost:8000
+
+**Want different model?** Run: `python vllm/deploy.py --list-models`
+
+## 🔥 Features
+
+- **Drag & drop PDFs** - Easy file upload
+- **Custom fields** - Extract exactly what you need
+- **Real-time processing** - See progress as it works
+- **Multiple models** - Support for LLaVA, MiniCPM-V, Qwen-VL
+- **Export results** - Download as JSON
+- **Cloud ready** - Deploy anywhere
+
+---
+
+**That's it!** Simple, clean, and powerful document extraction with AI. 

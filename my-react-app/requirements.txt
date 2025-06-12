@@ -1,5 +1,5 @@
 fastapi
 uvicorn
-fitz
-pillow
+python-multipart
+PyMuPDF
 httpx

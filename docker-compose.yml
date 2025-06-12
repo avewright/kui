@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # vLLM Vision Model Server
+  vllm-server:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-server
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    command: [
+      "--model", "llava-hf/llava-1.5-7b-hf",
+      "--host", "0.0.0.0",
+      "--port", "8000",
+      "--max-model-len", "4096",
+      "--gpu-memory-utilization", "0.9",
+      "--dtype", "auto",
+      "--trust-remote-code"
+    ]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: "all"
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - document-extraction
+
+  # FastAPI Backend
+  api-server:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: api-server
+    ports:
+      - "8080:8080"
+    environment:
+      - VLLM_ENDPOINT=http://vllm-server:8000
+      - API_PORT=8080
+    depends_on:
+      vllm-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - document-extraction
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+    depends_on:
+      api-server:
+        condition: service_healthy
+    networks:
+      - document-extraction
+
+networks:
+  document-extraction:
+    driver: bridge
+
+volumes:
+  model-cache:
+    driver: local 

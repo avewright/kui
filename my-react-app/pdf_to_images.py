@@ -166,35 +166,44 @@ async def start_ai_metadata_extraction(file: UploadFile = File(...)):
 async def get_ai_metadata_page(processing_id: str, page_number: int):
     """Get AI metadata for a specific page from sequential processing"""
     try:
-        # Make request to AI model sequential get endpoint
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.get(
-                f"http://127.0.0.1:5000/tbe/sequential/{processing_id}/{page_number}"
-            )
+        # Make request to AI model sequential get endpoint with retries
+        max_retries = 3
+        retry_delay = 2  # seconds
         
-        print(f"AI model response for page {page_number}: Status {response.status_code}")
-        
-        if response.status_code == 200:
-            ai_data = response.json()
-            return ai_data
-        elif response.status_code == 404:
-            # Page not ready yet - this is expected, return 404 to client
-            raise HTTPException(status_code=404, detail="Page not ready yet")
-        else:
-            # Log the actual error from AI model
-            error_text = response.text
-            print(f"AI model error for page {page_number}: {response.status_code} - {error_text}")
+        for attempt in range(max_retries):
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                response = await client.get(
+                    f"http://127.0.0.1:5000/tbe/sequential/{processing_id}/{page_number}"
+                )
             
-            # Return a structured error that the client can handle
-            raise HTTPException(
-                status_code=422,  # Use 422 to distinguish from our server errors
-                detail={
-                    "error": "ai_model_error",
-                    "message": f"AI model returned error for page {page_number}",
-                    "status_code": response.status_code,
-                    "ai_error": error_text
-                }
-            )
+            print(f"AI model response for page {page_number} (attempt {attempt + 1}): Status {response.status_code}")
+            
+            if response.status_code == 200:
+                ai_data = response.json()
+                return ai_data
+            elif response.status_code == 404:
+                # Page not ready yet - retry if we have attempts left
+                if attempt < max_retries - 1:
+                    print(f"Page {page_number} not ready, retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    # Final attempt failed, return 404 to client
+                    raise HTTPException(status_code=404, detail="Page not ready yet")
+            else:
+                # Other error - log and return immediately
+                error_text = response.text
+                print(f"AI model error for page {page_number}: {response.status_code} - {error_text}")
+                
+                raise HTTPException(
+                    status_code=422,  # Use 422 to distinguish from our server errors
+                    detail={
+                        "error": "ai_model_error",
+                        "message": f"AI model returned error for page {page_number}",
+                        "status_code": response.status_code,
+                        "ai_error": error_text
+                    }
+                )
             
     except httpx.TimeoutException:
         print(f"Timeout requesting AI metadata for page {page_number}")
@@ -214,6 +223,9 @@ async def get_ai_metadata_page(processing_id: str, page_number: int):
                 "message": "AI model service unavailable"
             }
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         print(f"Unexpected error requesting AI metadata for page {page_number}: {str(e)}")
         raise HTTPException(

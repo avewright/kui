@@ -1,0 +1,31 @@
+# vLLM Configuration for Document Extraction
+# This file configures the vision model deployment
+
+# Model configuration
+model: "llava-hf/llava-1.5-7b-hf"  # Default vision model
+port: 8000
+host: "0.0.0.0"
+
+# Performance settings
+max_model_len: 4096
+gpu_memory_utilization: 0.9
+dtype: "auto"
+max_num_seqs: 32
+
+# Optional settings
+trust_remote_code: true
+disable_log_stats: false
+worker_use_ray: false
+
+# Chat template (will be auto-generated if not specified)
+chat_template: null
+
+# Alternative models (uncomment to use):
+# model: "llava-hf/llava-1.5-13b-hf"     # Larger LLaVA model
+# model: "openbmb/MiniCPM-V-2_6"         # MiniCPM-V model
+# model: "llava-hf/llava-v1.6-mistral-7b-hf"  # LLaVA-Next model
+
+# Environment-specific overrides
+# For production deployment, adjust these values:
+# gpu_memory_utilization: 0.95  # Use more GPU memory in production
+# max_num_seqs: 64             # Handle more concurrent requests 
