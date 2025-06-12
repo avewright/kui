@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import io
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF provides the 'fitz' module
 import base64
 import asyncio
 import hashlib
@@ -13,6 +13,7 @@ import tempfile
 import os
 import httpx
 from typing import Dict
+import time  # for simple timeout loop
 
 app = fastapi.FastAPI()
 
@@ -140,7 +141,7 @@ async def start_ai_metadata_extraction(file: UploadFile = File(...)):
         files = {"file": (file.filename, contents, file.content_type)}
         
         # Make request to AI model sequential start endpoint
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:  # Reduced timeout
             response = await client.post(
                 "http://127.0.0.1:5000/tbe/sequential/start",
                 files=files
@@ -150,79 +151,72 @@ async def start_ai_metadata_extraction(file: UploadFile = File(...)):
             ai_data = response.json()
             return ai_data
         else:
+            print(f"AI service error: {response.status_code} - {response.text}")
             raise HTTPException(
                 status_code=response.status_code, 
                 detail=f"AI model returned error: {response.text}"
             )
             
     except httpx.TimeoutException:
+        print("AI service timeout on start")
         raise HTTPException(status_code=408, detail="AI model request timed out")
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="AI model service unavailable")
+        print("AI service connection error - service may not be running on port 5000")
+        raise HTTPException(status_code=503, detail="AI model service unavailable - ensure AI service is running on port 5000")
     except Exception as e:
+        print(f"Unexpected error calling AI service: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error calling AI model: {str(e)}")
 
 @app.get("/ai_metadata/{processing_id}/{page_number}")
 async def get_ai_metadata_page(processing_id: str, page_number: int):
-    """Get AI metadata for a specific page from sequential processing"""
-    try:
-        # Make request to AI model sequential get endpoint
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.get(
-                f"http://127.0.0.1:5000/tbe/sequential/{processing_id}/{page_number}"
-            )
-        
-        print(f"AI model response for page {page_number}: Status {response.status_code}")
-        
-        if response.status_code == 200:
-            ai_data = response.json()
-            return ai_data
-        elif response.status_code == 404:
-            # Page not ready yet - this is expected, return 404 to client
-            raise HTTPException(status_code=404, detail="Page not ready yet")
-        else:
-            # Log the actual error from AI model
-            error_text = response.text
-            print(f"AI model error for page {page_number}: {response.status_code} - {error_text}")
-            
-            # Return a structured error that the client can handle
-            raise HTTPException(
-                status_code=422,  # Use 422 to distinguish from our server errors
-                detail={
-                    "error": "ai_model_error",
-                    "message": f"AI model returned error for page {page_number}",
-                    "status_code": response.status_code,
-                    "ai_error": error_text
-                }
-            )
-            
-    except httpx.TimeoutException:
-        print(f"Timeout requesting AI metadata for page {page_number}")
-        raise HTTPException(
-            status_code=408, 
-            detail={
-                "error": "timeout",
-                "message": f"AI model request timed out for page {page_number}"
-            }
-        )
-    except httpx.ConnectError:
-        print(f"Connection error requesting AI metadata for page {page_number}")
-        raise HTTPException(
-            status_code=503, 
-            detail={
-                "error": "connection_error",
-                "message": "AI model service unavailable"
-            }
-        )
-    except Exception as e:
-        print(f"Unexpected error requesting AI metadata for page {page_number}: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail={
-                "error": "unexpected_error",
-                "message": f"Error calling AI model: {str(e)}"
-            }
-        )
+    """Proxy to the AI-model sequential endpoint and _wait_ until the page is ready.
+
+    Instead of bailing out after a handful of fast retries (which caused premature 500s),
+    we poll the model every `poll_delay` seconds until either a success response is
+    received or an overall timeout is reached. While the request remains pending the
+    HTTP connection stays open, so the React front-end can simply `await` this call
+    and does **not** need its own retry loop.
+    """
+
+    poll_delay = 2         # seconds between polls to the AI service
+    max_wait_seconds = 300  # overall patience (5 min) – tweak as needed
+
+    deadline = time.time() + max_wait_seconds
+
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"http://127.0.0.1:5000/tbe/sequential/{processing_id}/{page_number}"
+                )
+
+            if response.status_code == 200:
+                return response.json()
+
+            if response.status_code == 404:
+                # Page not ready – wait then poll again (as long as we haven't timed out)
+                if time.time() < deadline:
+                    await asyncio.sleep(poll_delay)
+                    continue
+                raise HTTPException(status_code=504, detail="Timed out waiting for AI metadata")
+
+            # Any other status from the AI model is surfaced directly
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+        except httpx.TimeoutException:
+            # Treat a timeout contacting the AI service like a temporary hiccup – retry unless we're out of time
+            if time.time() < deadline:
+                await asyncio.sleep(poll_delay)
+                continue
+            raise HTTPException(status_code=504, detail="Timed out waiting for AI metadata (network)")
+        except httpx.ConnectError:
+            raise HTTPException(status_code=503, detail="AI model service unavailable – is it running on port 5000?")
+        except HTTPException:
+            # Re-raise our own HTTP exceptions untouched so FastAPI returns the intended status
+            raise
+        except Exception as exc:
+            print(f"Unexpected error when querying AI metadata for page {page_number}: {exc}")
+            raise HTTPException(status_code=500, detail="Unexpected server error while querying AI metadata")
 
 async def convert_pdf_page_to_image(pdf_bytes: bytes, page_number: int) -> Image.Image:
     """Convert a specific PDF page to an image"""

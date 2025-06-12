@@ -162,9 +162,11 @@ function App() {
   const fetchAiMetadataForPage = async (processingId, pageNumber) => {
     if (!processingId) return null;
     
-    // Retry logic for getting AI metadata
-    const maxRetries = 8; // Reduced retries to fail faster
-    const retryDelay = 3000; // 3 seconds between retries
+    // The backend now waits until the AI metadata is ready (up to ~5 min),
+    // so we only need a single attempt here. We keep a minimal retry in case
+    // of transient network errors.
+    const maxRetries = 2;
+    const retryDelay = 3000; // 3 s between retries if the network itself fails
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -177,16 +179,23 @@ function App() {
         } else if (response.status === 404) {
           // Page not ready yet, wait and retry
           console.log(`⏳ Page ${pageNumber} not ready yet, attempt ${attempt + 1}/${maxRetries}`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-          continue;
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          return null;
         } else if (response.status === 422) {
           // AI model error - don't retry, fall back immediately
           const errorData = await response.json();
           console.warn(`❌ AI model failed for page ${pageNumber}:`, errorData.detail);
           return null;
-        } else if (response.status === 408 || response.status === 503) {
-          // Timeout or service unavailable - try a few more times
-          console.warn(`⚠️ AI service issue for page ${pageNumber}: ${response.status}, attempt ${attempt + 1}/${maxRetries}`);
+        } else if (response.status === 503) {
+          // Service unavailable - AI service is down
+          console.warn(`❌ AI service unavailable for page ${pageNumber} - likely no AI service running`);
+          return null;
+        } else if (response.status === 408) {
+          // Timeout - retry once
+          console.warn(`⏱️ AI service timeout for page ${pageNumber}, attempt ${attempt + 1}/${maxRetries}`);
           if (attempt < maxRetries - 1) {
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
