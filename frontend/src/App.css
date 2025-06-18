@@ -1076,3 +1076,84 @@ button {
     justify-content: center;
   }
 }
+
+/* Asset Metadata Styling */
+.asset-metadata-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.asset-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.asset-field label {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.asset-value-container {
+  margin: 0;
+}
+
+.asset-value-container p {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background-color: white;
+  border-radius: 6px;
+  font-weight: 500;
+  color: var(--text-dark);
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+}
+
+.asset-input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.asset-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.no-data-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--bg-lighter);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border-color);
+}
+
+.no-data-message p {
+  color: var(--text-light);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Responsive adjustments for asset metadata */
+@media (max-width: 768px) {
+  .asset-metadata-content {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .asset-metadata-content {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+  }
+}

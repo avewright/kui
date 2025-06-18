@@ -138,55 +138,15 @@ function App() {
       const info = await infoResponse.json();
       setPdfInfo(info);
       
-      // Try to start AI sequential processing with timeout
-      console.log("🚀 Starting AI sequential processing...");
-      let firstPageAiData = null;
-      let processingId = null;
-      
-      try {
-        // Add timeout to AI request
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const aiStartResponse = await fetch('http://127.0.0.1:8080/ai_metadata/start', {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (aiStartResponse.ok) {
-          const aiStartData = await aiStartResponse.json();
-          processingId = aiStartData.processing_id;
-          firstPageAiData = aiStartData.result;
-          setAiProcessingId(processingId);
-          console.log("AI processing started:", aiStartData);
-        } else {
-          console.warn("AI metadata extraction failed to start, will use fallback data");
-        }
-      } catch (aiError) {
-        console.warn("AI service unavailable or timed out, proceeding with fallback data:", aiError.message);
-      }
-      
-      // Initialize arrays for the expected number of pages
-      const initialResults = new Array(info.page_count).fill(null);
-      const initialMetadata = new Array(info.page_count).fill(null);
-      const initialLoadingStates = new Array(info.page_count).fill(true);
-      
-      setImageResults(initialResults);
-      setMetadata(initialMetadata);
-      setPageLoadingStates(initialLoadingStates);
-      setLoadingProgress({ loaded: 0, total: info.page_count });
-
-      // Load first page immediately (with AI data if available, otherwise fallback)
-      console.log("📄 Loading first page...");
-      await loadPageWithData(info.pdf_id, 0, firstPageAiData);
-
-      // Start background loading of remaining pages
-      if (info.page_count > 1) {
-        console.log(`📚 Starting background loading of ${info.page_count - 1} remaining pages...`);
-        loadRemainingPagesSequentially(info.pdf_id, info.page_count, processingId);
+      // Handle different model types
+      if (modelType === 'asset') {
+        // For asset/receipt extraction, process each page individually
+        console.log("🚀 Starting Asset/Receipt extraction...");
+        await processAssetExtraction(info);
+      } else {
+        // Original drawing metadata extraction flow
+        console.log("🚀 Starting Drawing metadata extraction...");
+        await processDrawingExtraction(info, formData);
       }
 
     } catch (error) {
@@ -194,6 +154,85 @@ function App() {
       setError(error.message || "Failed to process the PDF. Please try again.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const processAssetExtraction = async (info) => {
+    // Initialize arrays for the expected number of pages
+    const initialResults = new Array(info.page_count).fill(null);
+    const initialMetadata = new Array(info.page_count).fill(null);
+    const initialLoadingStates = new Array(info.page_count).fill(true);
+    
+    setImageResults(initialResults);
+    setMetadata(initialMetadata);
+    setPageLoadingStates(initialLoadingStates);
+    setLoadingProgress({ loaded: 0, total: info.page_count });
+
+    // Load all pages with asset extraction
+    for (let pageIndex = 0; pageIndex < info.page_count; pageIndex++) {
+      try {
+        await loadPageWithAssetData(info.pdf_id, pageIndex);
+        setLoadingProgress(prev => ({ ...prev, loaded: pageIndex + 1 }));
+      } catch (error) {
+        console.error(`Error loading page ${pageIndex}:`, error);
+        setPageLoadingStates(prev => {
+          const updated = [...prev];
+          updated[pageIndex] = 'error';
+          return updated;
+        });
+      }
+    }
+  };
+
+  const processDrawingExtraction = async (info, formData) => {
+    // Try to start AI sequential processing with timeout
+    let firstPageAiData = null;
+    let processingId = null;
+    
+    try {
+      // Add timeout to AI request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const aiStartResponse = await fetch('http://127.0.0.1:8080/ai_metadata/start', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (aiStartResponse.ok) {
+        const aiStartData = await aiStartResponse.json();
+        processingId = aiStartData.processing_id;
+        firstPageAiData = aiStartData.result;
+        setAiProcessingId(processingId);
+        console.log("AI processing started:", aiStartData);
+      } else {
+        console.warn("AI metadata extraction failed to start, will use fallback data");
+      }
+    } catch (aiError) {
+      console.warn("AI service unavailable or timed out, proceeding with fallback data:", aiError.message);
+    }
+    
+    // Initialize arrays for the expected number of pages
+    const initialResults = new Array(info.page_count).fill(null);
+    const initialMetadata = new Array(info.page_count).fill(null);
+    const initialLoadingStates = new Array(info.page_count).fill(true);
+    
+    setImageResults(initialResults);
+    setMetadata(initialMetadata);
+    setPageLoadingStates(initialLoadingStates);
+    setLoadingProgress({ loaded: 0, total: info.page_count });
+
+    // Load first page immediately (with AI data if available, otherwise fallback)
+    console.log("📄 Loading first page...");
+    await loadPageWithData(info.pdf_id, 0, firstPageAiData);
+
+    // Start background loading of remaining pages
+    if (info.page_count > 1) {
+      console.log(`📚 Starting background loading of ${info.page_count - 1} remaining pages...`);
+      loadRemainingPagesSequentially(info.pdf_id, info.page_count, processingId);
     }
   };
 
@@ -255,6 +294,128 @@ function App() {
     return null;
   };
 
+  const loadPageWithAssetData = async (pdfId, pageIndex) => {
+    try {
+      // Get the image for this page
+      const pageData = await fetchPageImage(pdfId, pageIndex);
+      
+      // Update the image
+      setImageResults(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = pageData.image;
+        return updated;
+      });
+
+      // For asset extraction, call the asset plate extraction API
+      const assetData = await extractAssetMetadata(pageData.image);
+      
+      // Convert asset response to our internal format
+      const pageMetadata = {
+        type: 'asset',
+        fields: assetData || {},
+        isEdited: false,
+        isAiGenerated: true
+      };
+
+      setMetadata(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = pageMetadata;
+        return updated;
+      });
+
+      // Update loading state for this page
+      setPageLoadingStates(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = false;
+        return updated;
+      });
+
+    } catch (error) {
+      console.error(`Error loading asset data for page ${pageIndex}:`, error);
+      setPageLoadingStates(prev => {
+        const updated = [...prev];
+        updated[pageIndex] = 'error';
+        return updated;
+      });
+    }
+  };
+
+  const extractAssetMetadata = async (imageBase64) => {
+    try {
+      // Convert base64 to blob for upload
+      const byteCharacters = atob(imageBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {type: 'image/png'});
+      
+      const formData = new FormData();
+      formData.append('file', blob, 'page.png');
+      
+      // Define default fields for asset extraction
+      const assetInput = {
+        fields: [
+          {
+            field_name: "asset_number",
+            field_type: "text",
+            field_mapping: "asset_number_field"
+          },
+          {
+            field_name: "asset_type",
+            field_type: "text", 
+            field_mapping: "asset_type_field"
+          },
+          {
+            field_name: "description",
+            field_type: "text",
+            field_mapping: "description_field"
+          },
+          {
+            field_name: "manufacturer",
+            field_type: "text",
+            field_mapping: "manufacturer_field"
+          },
+          {
+            field_name: "model",
+            field_type: "text",
+            field_mapping: "model_field"
+          },
+          {
+            field_name: "serial_number",
+            field_type: "text",
+            field_mapping: "serial_number_field"
+          }
+        ]
+      };
+
+      // Add the input fields as JSON string in form data (based on API design)
+      formData.append('input', JSON.stringify(assetInput));
+
+      const response = await fetch('http://127.0.0.1:8080/asset_plate_extract', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const responseText = await response.text();
+        try {
+          return JSON.parse(responseText);
+        } catch {
+          // If it's not JSON, return as a simple text response
+          return { extracted_text: responseText };
+        }
+      } else {
+        console.warn("Asset extraction failed, using fallback");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error extracting asset metadata:", error);
+      return null;
+    }
+  };
+
   const loadPageWithData = async (pdfId, pageIndex, aiData) => {
     try {
       // Get the image for this page
@@ -272,6 +433,7 @@ function App() {
       if (aiData) {
         // Convert AI response format to our internal format
         pageMetadata = {
+          type: 'drawing',
           title: aiData.drawing_title || '',
           drawingNumber: aiData.drawing_number || '',
           revisions: aiData.revision_history ? aiData.revision_history.map((rev, idx) => ({
@@ -285,6 +447,7 @@ function App() {
       } else {
         // Fallback to dummy data
         pageMetadata = {
+          type: 'drawing',
           title: ``,
           drawingNumber: ``,
           revisions: [],
@@ -376,6 +539,20 @@ function App() {
     updatedMetadata[index] = {
       ...updatedMetadata[index],
       [field]: value,
+      isEdited: true
+    };
+    setMetadata(updatedMetadata);
+  };
+
+  const handleAssetFieldEdit = (index, fieldKey, value) => {
+    const updatedMetadata = [...metadata];
+    const currentItem = updatedMetadata[index];
+    updatedMetadata[index] = {
+      ...currentItem,
+      fields: {
+        ...currentItem.fields,
+        [fieldKey]: value
+      },
       isEdited: true
     };
     setMetadata(updatedMetadata);
@@ -730,7 +907,9 @@ function App() {
                     {metadata[currentVisiblePage] && (
                       <div className="metadata-panel">
                         <div className="metadata-header">
-                          <h3>Metadata</h3>
+                          <h3>
+                            {metadata[currentVisiblePage]?.type === 'asset' ? 'Asset Information' : 'Drawing Metadata'}
+                          </h3>
                           {editingIndex === currentVisiblePage ? (
                             <button className="small-button" onClick={stopEditing}>Done</button>
                           ) : (
@@ -738,118 +917,147 @@ function App() {
                           )}
                         </div>
                         
-                        <div className="metadata-content">
-                          <div className="metadata-field">
-                            <label>Title</label>
-                            {editingIndex === currentVisiblePage ? (
-                              <input
-                                type="text"
-                                value={metadata[currentVisiblePage]?.title || ''}
-                                onChange={(e) => handleMetadataEdit(currentVisiblePage, 'title', e.target.value)}
-                                className="metadata-input"
-                              />
-                            ) : (
-                              <div className="metadata-value-container">
-                                <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                  {metadata[currentVisiblePage]?.title || 'Unknown Title'}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="metadata-field">
-                            <label>Drawing Number</label>
-                            {editingIndex === currentVisiblePage ? (
-                              <input
-                                type="text"
-                                value={metadata[currentVisiblePage]?.drawingNumber || ''}
-                                onChange={(e) => handleMetadataEdit(currentVisiblePage, 'drawingNumber', e.target.value)}
-                                className="metadata-input"
-                              />
-                            ) : (
-                              <div className="metadata-value-container">
-                                <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                  {metadata[currentVisiblePage]?.drawingNumber || 'Unknown Number'}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="metadata-field">
-                            <label>Revisions</label>
-                            {editingIndex === currentVisiblePage ? (
-                              <div className="revision-table">
-                                <div className="revision-row">
-                                  <div className="revision-cell">ID</div>
-                                  <div className="revision-cell">Description</div>
-                                  <div className="revision-cell">Date</div>
-                                  <div className="revision-cell">Actions</div>
-                                </div>
-                                {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
-                                  <div key={revisionIndex} className="revision-row">
-                                    <div className="revision-cell">
-                                      <input
-                                        type="text"
-                                        value={revision.id}
-                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'id', e.target.value)}
-                                        className="revision-input"
-                                      />
-                                    </div>
-                                    <div className="revision-cell">
-                                      <input
-                                        type="text"
-                                        value={revision.description}
-                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'description', e.target.value)}
-                                        className="revision-input"
-                                      />
-                                    </div>
-                                    <div className="revision-cell">
-                                      <input
-                                        type="date"
-                                        value={revision.date}
-                                        onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'date', e.target.value)}
-                                        className="revision-input"
-                                      />
-                                    </div>
-                                    <div className="revision-cell">
-                                      <button 
-                                        className="small-button" 
-                                        style={{ backgroundColor: 'var(--danger)' }}
-                                        onClick={() => removeRevisionRow(currentVisiblePage, revisionIndex)}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
+                        {metadata[currentVisiblePage]?.type === 'asset' ? (
+                          <div className="asset-metadata-content">
+                            {Object.entries(metadata[currentVisiblePage]?.fields || {}).map(([key, value]) => (
+                              <div key={key} className="asset-field">
+                                <label>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                                {editingIndex === currentVisiblePage ? (
+                                  <input
+                                    type="text"
+                                    value={value || ''}
+                                    onChange={(e) => handleAssetFieldEdit(currentVisiblePage, key, e.target.value)}
+                                    className="asset-input"
+                                  />
+                                ) : (
+                                  <div className="asset-value-container">
+                                    <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                      {value || 'Not detected'}
+                                    </p>
                                   </div>
-                                ))}
-                                <div className="revision-actions" style={{ marginTop: '0.5rem' }}>
-                                  <button className="small-button" onClick={() => addRevisionRow(currentVisiblePage)}>Add Revision</button>
-                                </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="revision-table">
-                                <div className="revision-row">
-                                  <div className="revision-cell">ID</div>
-                                  <div className="revision-cell">Description</div>
-                                  <div className="revision-cell">Date</div>
-                                </div>
-                                {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
-                                  <div key={revisionIndex} className="revision-row">
-                                    <div className="revision-cell">
-                                      <p>{revision.id}</p>
-                                    </div>
-                                    <div className="revision-cell">
-                                      <p>{revision.description}</p>
-                                    </div>
-                                    <div className="revision-cell">
-                                      <p>{revision.date}</p>
-                                    </div>
-                                  </div>
-                                ))}
+                            ))}
+                            {(!metadata[currentVisiblePage]?.fields || Object.keys(metadata[currentVisiblePage].fields).length === 0) && (
+                              <div className="no-data-message">
+                                <p>No asset information was extracted from this page.</p>
                               </div>
                             )}
                           </div>
-                        </div>
+                        ) : (
+                          <div className="metadata-content">
+                            <div className="metadata-field">
+                              <label>Title</label>
+                              {editingIndex === currentVisiblePage ? (
+                                <input
+                                  type="text"
+                                  value={metadata[currentVisiblePage]?.title || ''}
+                                  onChange={(e) => handleMetadataEdit(currentVisiblePage, 'title', e.target.value)}
+                                  className="metadata-input"
+                                />
+                              ) : (
+                                <div className="metadata-value-container">
+                                  <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                    {metadata[currentVisiblePage]?.title || 'Unknown Title'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="metadata-field">
+                              <label>Drawing Number</label>
+                              {editingIndex === currentVisiblePage ? (
+                                <input
+                                  type="text"
+                                  value={metadata[currentVisiblePage]?.drawingNumber || ''}
+                                  onChange={(e) => handleMetadataEdit(currentVisiblePage, 'drawingNumber', e.target.value)}
+                                  className="metadata-input"
+                                />
+                              ) : (
+                                <div className="metadata-value-container">
+                                  <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                    {metadata[currentVisiblePage]?.drawingNumber || 'Unknown Number'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="metadata-field">
+                              <label>Revisions</label>
+                              {editingIndex === currentVisiblePage ? (
+                                <div className="revision-table">
+                                  <div className="revision-row">
+                                    <div className="revision-cell">ID</div>
+                                    <div className="revision-cell">Description</div>
+                                    <div className="revision-cell">Date</div>
+                                    <div className="revision-cell">Actions</div>
+                                  </div>
+                                  {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
+                                    <div key={revisionIndex} className="revision-row">
+                                      <div className="revision-cell">
+                                        <input
+                                          type="text"
+                                          value={revision.id}
+                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'id', e.target.value)}
+                                          className="revision-input"
+                                        />
+                                      </div>
+                                      <div className="revision-cell">
+                                        <input
+                                          type="text"
+                                          value={revision.description}
+                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'description', e.target.value)}
+                                          className="revision-input"
+                                        />
+                                      </div>
+                                      <div className="revision-cell">
+                                        <input
+                                          type="date"
+                                          value={revision.date}
+                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'date', e.target.value)}
+                                          className="revision-input"
+                                        />
+                                      </div>
+                                      <div className="revision-cell">
+                                        <button 
+                                          className="small-button" 
+                                          style={{ backgroundColor: 'var(--danger)' }}
+                                          onClick={() => removeRevisionRow(currentVisiblePage, revisionIndex)}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <div className="revision-actions" style={{ marginTop: '0.5rem' }}>
+                                    <button className="small-button" onClick={() => addRevisionRow(currentVisiblePage)}>Add Revision</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="revision-table">
+                                  <div className="revision-row">
+                                    <div className="revision-cell">ID</div>
+                                    <div className="revision-cell">Description</div>
+                                    <div className="revision-cell">Date</div>
+                                  </div>
+                                  {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
+                                    <div key={revisionIndex} className="revision-row">
+                                      <div className="revision-cell">
+                                        <p>{revision.id}</p>
+                                      </div>
+                                      <div className="revision-cell">
+                                        <p>{revision.description}</p>
+                                      </div>
+                                      <div className="revision-cell">
+                                        <p>{revision.date}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     
