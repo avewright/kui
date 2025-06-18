@@ -225,72 +225,128 @@ function App() {
     setPageLoadingStates(initialLoadingStates);
     setLoadingProgress({ loaded: 0, total: info.page_count });
 
-    // Load first page immediately (with AI data if available, otherwise fallback)
-    console.log("📄 Loading first page...");
-    await loadPageWithData(info.pdf_id, 0, firstPageAiData);
-
-    // Start background loading of remaining pages
-    if (info.page_count > 1) {
-      console.log(`📚 Starting background loading of ${info.page_count - 1} remaining pages...`);
-      loadRemainingPagesSequentially(info.pdf_id, info.page_count, processingId);
+    // Process all pages consistently using the same logic
+    console.log(`📚 Starting sequential processing of ${info.page_count} pages...`);
+    
+    let failedPages = [];
+    let successfulPages = 0;
+    
+    // Process all pages sequentially starting from page 1
+    for (let pageIndex = 0; pageIndex < info.page_count; pageIndex++) {
+      const pageNumber = pageIndex + 1;
+      
+      try {
+        console.log(`🔄 Processing page ${pageNumber}...`);
+        
+        // Get AI metadata for this page (with proper retry logic)
+        const aiData = await fetchAiMetadataForPage(processingId, pageNumber);
+        
+        if (aiData) {
+          // Success - got real AI data
+          await loadPageWithData(info.pdf_id, pageIndex, aiData);
+          successfulPages++;
+          console.log(`✅ Page ${pageNumber} processed successfully with AI data`);
+        } else {
+          // Failed to get AI data - mark as failed and use fallback
+          failedPages.push(pageNumber);
+          await loadPageWithData(info.pdf_id, pageIndex, null);
+          console.warn(`⚠️ Page ${pageNumber} failed AI processing - using fallback data`);
+        }
+        
+        // Small delay between pages to not overwhelm the system
+        if (pageIndex < info.page_count - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error processing page ${pageNumber}:`, error);
+        failedPages.push(pageNumber);
+        // Continue with next page even if this one fails
+        await loadPageWithData(info.pdf_id, pageIndex, null);
+      }
+    }
+    
+    // Report processing results to user
+    if (failedPages.length === 0) {
+      console.log(`🎉 All ${info.page_count} pages processed successfully!`);
+    } else if (successfulPages > 0) {
+      console.warn(`⚠️ Processing completed with issues: ${successfulPages}/${info.page_count} pages successful`);
+      console.warn(`📋 Failed pages (using fallback data): ${failedPages.join(', ')}`);
+      
+      // Show user-friendly error message
+      setError(`AI processing partially failed. ${successfulPages}/${info.page_count} pages processed successfully. Pages ${failedPages.join(', ')} are showing placeholder data. The AI service may be overloaded - you can try re-processing or use the extracted images.`);
+    } else {
+      console.error(`❌ All pages failed AI processing - using fallback data for entire document`);
+      setError(`AI processing failed for all pages. The AI service may be unavailable. All pages are showing placeholder data. You can still view the extracted images.`);
     }
   };
 
   const fetchAiMetadataForPage = async (processingId, pageNumber) => {
-    if (!processingId) return null;
+    if (!processingId) {
+      console.warn(`❌ No processing ID available for page ${pageNumber} - skipping AI processing`);
+      return null;
+    }
     
-    // The backend now waits until the AI metadata is ready (up to ~5 min),
-    // so we only need a single attempt here. We keep a minimal retry in case
-    // of transient network errors.
-    const maxRetries = 2;
-    const retryDelay = 3000; // 3 s between retries if the network itself fails
+    // Enhanced retry logic with exponential backoff
+    const maxRetries = 3;
+    const baseRetryDelay = 2000; // Start with 2 seconds
+    const maxRetryDelay = 10000; // Cap at 10 seconds
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        console.log(`🔍 Fetching AI metadata for page ${pageNumber} (attempt ${attempt + 1}/${maxRetries})...`);
+        
         const response = await fetch(`http://127.0.0.1:8080/ai_metadata/${processingId}/${pageNumber}`);
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`✅ AI metadata loaded for page ${pageNumber}`);
+          console.log(`✅ AI metadata received for page ${pageNumber}`);
           return data.result;
         } else if (response.status === 404) {
-          // Page not ready yet, wait and retry
-          console.log(`⏳ Page ${pageNumber} not ready yet, attempt ${attempt + 1}/${maxRetries}`);
+          // Page not ready yet - common during processing
+          console.log(`⏳ Page ${pageNumber} still processing... (attempt ${attempt + 1}/${maxRetries})`);
           if (attempt < maxRetries - 1) {
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            const delay = Math.min(baseRetryDelay * Math.pow(2, attempt), maxRetryDelay);
+            console.log(`   Waiting ${delay/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
+          console.warn(`⏱️ Page ${pageNumber} processing timeout after ${maxRetries} attempts`);
           return null;
         } else if (response.status === 422) {
           // AI model error - don't retry, fall back immediately
           const errorData = await response.json();
-          console.warn(`❌ AI model failed for page ${pageNumber}:`, errorData.detail);
+          console.error(`🤖 AI model failed for page ${pageNumber}:`, errorData.detail);
           return null;
         } else if (response.status === 503) {
           // Service unavailable - AI service is down
-          console.warn(`❌ AI service unavailable for page ${pageNumber} - likely no AI service running`);
+          console.error(`🔌 AI service unavailable for page ${pageNumber}`);
           return null;
         } else if (response.status === 408) {
-          // Timeout - retry once
-          console.warn(`⏱️ AI service timeout for page ${pageNumber}, attempt ${attempt + 1}/${maxRetries}`);
+          // Request timeout - retry with backoff
+          console.warn(`⏱️ Request timeout for page ${pageNumber} (attempt ${attempt + 1}/${maxRetries})`);
           if (attempt < maxRetries - 1) {
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            const delay = Math.min(baseRetryDelay * Math.pow(2, attempt), maxRetryDelay);
+            await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
           return null;
         } else {
-          console.warn(`❌ Unexpected error for page ${pageNumber}: ${response.status}`);
+          console.error(`❌ Unexpected AI service error for page ${pageNumber}: HTTP ${response.status}`);
           return null;
         }
       } catch (error) {
-        console.warn(`🔗 Network error fetching AI metadata for page ${pageNumber}, attempt ${attempt + 1}:`, error);
+        console.error(`🔗 Network error for page ${pageNumber} (attempt ${attempt + 1}/${maxRetries}):`, error.message);
         if (attempt < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          const delay = Math.min(baseRetryDelay * Math.pow(2, attempt), maxRetryDelay);
+          console.log(`   Retrying in ${delay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
         }
       }
     }
     
-    console.warn(`❌ Failed to get AI metadata for page ${pageNumber} after ${maxRetries} attempts - using fallback data`);
+    console.error(`❌ Gave up on page ${pageNumber} after ${maxRetries} attempts - will use placeholder data`);
     return null;
   };
 
@@ -495,32 +551,7 @@ function App() {
     }
   };
 
-  const loadRemainingPagesSequentially = async (pdfId, totalPages, aiProcessingId) => {
-    // Process pages 2 onwards
-    for (let pageIndex = 1; pageIndex < totalPages; pageIndex++) {
-      const pageNumber = pageIndex + 1;
-      
-      try {
-        console.log(`🔄 Processing page ${pageNumber}...`);
-        
-        // Get AI metadata for this page (with proper retry logic)
-        const aiData = await fetchAiMetadataForPage(aiProcessingId, pageNumber);
-        
-        // Load the page with the AI data (or fallback)
-        await loadPageWithData(pdfId, pageIndex, aiData);
-        
-        // Small delay between pages to not overwhelm the system
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-      } catch (error) {
-        console.error(`❌ Error processing page ${pageNumber}:`, error);
-        // Continue with next page even if this one fails
-        await loadPageWithData(pdfId, pageIndex, null);
-      }
-    }
-    
-    console.log("🎉 All pages processing completed!");
-  };
+
 
   const cleanupPdf = async () => {
     if (pdfInfo?.pdf_id) {
@@ -800,8 +831,8 @@ function App() {
             textAlign: 'center'
           }}>
             {/* <p>Processing PDF: {pdfInfo.filename}</p> */}
-            <p>Pages loaded: {loadingProgress.loaded} of {loadingProgress.total}</p>
-            <div className="progress-bar" style={{
+            {/* <p>Pages loaded: {loadingProgress.loaded} of {loadingProgress.total}</p> */}
+            {/* <div className="progress-bar" style={{
               width: '100%',
               height: '8px',
               backgroundColor: 'var(--border-color)',
@@ -815,7 +846,7 @@ function App() {
                 backgroundColor: 'var(--primary)',
                 transition: 'width 0.3s ease'
               }}></div>
-            </div>
+            </div> */}
             {/* <div className="spinner"></div> */}
           </div>
         )}
@@ -958,7 +989,7 @@ function App() {
                               ) : (
                                 <div className="metadata-value-container">
                                   <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                    {metadata[currentVisiblePage]?.title || 'Unknown Title'}
+                                    {metadata[currentVisiblePage]?.title || ''}
                                   </p>
                                 </div>
                               )}
@@ -976,7 +1007,7 @@ function App() {
                               ) : (
                                 <div className="metadata-value-container">
                                   <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                    {metadata[currentVisiblePage]?.drawingNumber || 'Unknown Number'}
+                                    {metadata[currentVisiblePage]?.drawingNumber || ''}
                                   </p>
                                 </div>
                               )}
