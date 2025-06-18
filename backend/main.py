@@ -1,6 +1,6 @@
 from PIL import Image
 import fastapi
-from fastapi import File, UploadFile, HTTPException
+from fastapi import File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -14,6 +14,7 @@ import os
 import httpx
 from typing import Dict
 import time  # for simple timeout loop
+import json
 
 # Import our custom modules
 from app.utils.logging import setup_logging, get_logger
@@ -199,6 +200,40 @@ async def get_ai_metadata_page(processing_id: str, page_number: int):
     except Exception as e:
         logger.error(f"❌ Error getting AI metadata for page {page_number}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting metadata: {str(e)}")
+
+@app.post("/asset_plate_extract")
+async def extract_asset_plate(file: UploadFile = File(...), input: str = Form(...)):
+    """Extract asset information from plates, tags, and receipts"""
+    logger.info(f"🏷️ Starting asset plate extraction for: {file.filename}")
+    
+    try:
+        # Parse the input JSON
+        try:
+            input_data = json.loads(input)
+            fields = input_data.get('fields', [])
+            logger.debug(f"📋 Full field configuration: {fields}")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Invalid JSON in input parameter: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid JSON in input parameter")
+        
+        # Read the uploaded file
+        contents = await file.read()
+        logger.debug(f"📖 Read {len(contents)} bytes from {file.filename}")
+        
+        # Use AI client to extract asset data
+        logger.info("🤖 Processing asset extraction with AI client")
+        extracted_data = await ai_client.extract_asset_data(contents, file.filename, fields)
+        
+        logger.info(f"✅ Asset extraction completed with {len(extracted_data)} fields")
+        logger.debug(f"📊 Final extracted data: {extracted_data}")
+        
+        return extracted_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in asset extraction: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing asset extraction: {str(e)}")
 
 async def convert_pdf_page_to_image(pdf_bytes: bytes, page_number: int) -> Image.Image:
     """Convert a specific PDF page to PIL Image"""

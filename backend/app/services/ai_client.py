@@ -2,6 +2,7 @@
 AI Client Service with fallback to dummy data
 """
 import asyncio
+import json
 import httpx
 from typing import Dict, Any, Optional
 from ..utils.logging import get_logger
@@ -238,6 +239,86 @@ class AIServiceClient:
             return generate_dummy_page_response(processing_id, page_number)
         else:
             raise RuntimeError(f"AI processing timeout for page {page_number} and dummy data fallback disabled")
+
+    async def extract_asset_data(self, file_content: bytes, filename: str, fields: list) -> Dict[str, Any]:
+        """
+        Extract asset information from plates, tags, and receipts
+        
+        Args:
+            file_content: Image or PDF file content as bytes
+            filename: Original filename
+            fields: List of field configurations with field_name, field_type, field_mapping
+            
+        Returns:
+            Dictionary with extracted asset data using field_mapping as keys
+        """
+        logger.info(f"🏷️ Starting asset extraction for: {filename} with {len(fields)} fields")
+        logger.debug(f"🔧 Configuration: ALLOW_DUMMY_DATA={ALLOW_DUMMY_DATA}, FORCE_DUMMY_DATA={FORCE_DUMMY_DATA}")
+        
+        # Call the actual /asset_plate_extract endpoint
+        try:
+            # Prepare the request data
+            files = {"file": (filename, file_content, "image/jpeg" if filename.lower().endswith(('.jpg', '.jpeg', '.png')) else "application/pdf")}
+            form_data = {"input": json.dumps({"fields": fields})}
+            
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                logger.debug(f"🔗 Sending asset extraction request to {self.base_url}/asset_plate_extract")
+                response = await client.post(
+                    f"{self.base_url}/asset_plate_extract",
+                    files=files,
+                    data=form_data
+                )
+            
+            if response.status_code == 200:
+                ai_data = response.json()
+                logger.info(f"✅ Asset extraction completed successfully")
+                return ai_data
+            else:
+                logger.error(f"❌ AI service returned {response.status_code}: {response.text}")
+                raise RuntimeError(f"Asset extraction failed: {response.status_code} - {response.text}")
+                
+        except httpx.TimeoutException:
+            logger.error("⏱️ AI service timeout on asset extraction")
+            raise RuntimeError("Asset extraction timeout")
+        except httpx.ConnectError:
+            logger.error("🔌 AI service connection failed for asset extraction")
+            raise RuntimeError("Asset extraction connection failed")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error calling asset extraction service: {e}")
+            raise RuntimeError(f"Asset extraction error: {e}")
+
+
+    def _generate_dummy_asset_data(self, fields: list) -> Dict[str, Any]:
+        """Generate dummy asset data based on requested fields"""
+        extracted_data = {}
+        
+        for field in fields:
+            field_name = field.get('field_name', '')
+            field_type = field.get('field_type', 'text')
+            field_mapping = field.get('field_mapping', field_name)  # Use mapping as key
+            
+            logger.debug(f"🔍 Generating dummy data for field: {field_name} -> {field_mapping} (type: {field_type})")
+            
+            # Generate dummy data based on field name
+            if 'asset_number' in field_name.lower():
+                extracted_data[field_mapping] = "AS-2024-001"
+            elif 'model' in field_name.lower():
+                extracted_data[field_mapping] = "Industrial Pump Model XL-500"
+            elif 'serial' in field_name.lower():
+                extracted_data[field_mapping] = "SN123456789"
+            elif 'manufacturer' in field_name.lower():
+                extracted_data[field_mapping] = "ACME Industrial Corp"
+            elif 'description' in field_name.lower():
+                extracted_data[field_mapping] = "Heavy-duty centrifugal pump for industrial applications"
+            elif 'type' in field_name.lower():
+                extracted_data[field_mapping] = "Centrifugal Pump"
+            else:
+                # Generic dummy data for custom fields
+                extracted_data[field_mapping] = f"Extracted {field_name.replace('_', ' ').title()}"
+            
+            logger.debug(f"✅ Generated dummy data for {field_name} -> {field_mapping}: {extracted_data[field_mapping]}")
+        
+        return extracted_data
 
 # Global AI client instance
 ai_client = AIServiceClient() 

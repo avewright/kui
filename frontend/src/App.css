@@ -55,6 +55,11 @@
   text-align: center;
 }
 
+.container.field-config-mode {
+  max-width: 1000px;
+  width: 95%;
+}
+
 /* Kahua Logo Styling */
 .logo-container {
   position: absolute;
@@ -1155,5 +1160,405 @@ button {
   .asset-metadata-content {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 1.5rem;
+  }
+}
+
+/* Field Configuration Styling */
+.field-configuration {
+  margin-top: 2rem;
+  text-align: left;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-configuration h2 {
+  color: var(--text-dark);
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.field-configuration > p {
+  color: var(--text-light);
+  margin-bottom: 2.5rem;
+  font-size: 1.1rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.preset-fields {
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.05), rgba(52, 152, 219, 0.02));
+  border-radius: 16px;
+  border: 2px solid rgba(52, 152, 219, 0.1);
+  box-shadow: 0 4px 20px rgba(52, 152, 219, 0.08);
+}
+
+.preset-fields h3 {
+  color: var(--text-dark);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preset-fields h3::before {
+  content: "⚡";
+  font-size: 1.3rem;
+}
+
+.preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.preset-button {
+  background: white;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.preset-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.5s;
+}
+
+.preset-button:hover::before {
+  left: 100%;
+}
+
+.preset-button:hover {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+}
+
+.extraction-fields {
+  margin-bottom: 3rem;
+}
+
+.extraction-fields h3 {
+  color: var(--text-dark);
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.extraction-fields h3::before {
+  content: "⚙️";
+  font-size: 1.4rem;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  background: white;
+  border-radius: 16px;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.field-row:hover {
+  border-color: var(--primary);
+  box-shadow: 0 8px 25px rgba(52, 152, 219, 0.15);
+  transform: translateY(-2px);
+}
+
+.field-inputs {
+  display: grid;
+  grid-template-columns: 1fr 120px 1fr;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.field-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.field-input-group label {
+  font-size: 0.85rem;
+  color: var(--text-dark);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.field-input, .field-select {
+  padding: 0.75rem 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  transition: all 0.3s ease;
+  background: white;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.field-input:focus, .field-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+  transform: translateY(-1px);
+}
+
+.field-select {
+  cursor: pointer;
+}
+
+.field-input::placeholder {
+  color: var(--text-light);
+}
+
+.remove-field-button {
+  background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+  margin-left: 0.5rem;
+}
+
+.remove-field-button:hover {
+  background: linear-gradient(135deg, var(--danger-dark), var(--danger));
+  transform: scale(1.15) rotate(90deg);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+.add-field-button {
+  background: linear-gradient(135deg, var(--success), var(--success-dark));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+  justify-content: center;
+  max-width: 250px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.add-field-button:hover {
+  background: linear-gradient(135deg, var(--success-dark), var(--success));
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4);
+}
+
+.field-configuration-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  align-items: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--border-color);
+}
+
+.start-extraction-button {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border: none;
+  border-radius: 16px;
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.start-extraction-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s;
+}
+
+.start-extraction-button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.start-extraction-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  transform: translateY(-4px);
+  box-shadow: 0 12px 35px rgba(52, 152, 219, 0.5);
+}
+
+.start-extraction-button:disabled {
+  background: var(--text-light);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.start-extraction-button svg {
+  transition: transform 0.3s ease;
+}
+
+.start-extraction-button:hover:not(:disabled) svg {
+  transform: translateX(4px);
+}
+
+.back-button {
+  background: white;
+  color: var(--text-light);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background: var(--text-light);
+  color: white;
+  border-color: var(--text-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(127, 140, 141, 0.3);
+}
+
+/* Mobile responsive adjustments for field configuration */
+@media (max-width: 768px) {
+  .field-configuration {
+    padding: 0 0.5rem;
+  }
+  
+  .field-row {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .field-inputs {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    width: 100%;
+  }
+  
+  .remove-field-button {
+    align-self: center;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+  
+  .preset-buttons {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .preset-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .field-configuration-actions {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .start-extraction-button,
+  .back-button,
+  .field-configuration-actions .clear-button {
+    width: 100%;
+    justify-content: center;
+    padding: 1rem 2rem;
+  }
+  
+  .field-input-group label {
+    font-size: 0.8rem;
+  }
+  
+  .field-input, .field-select {
+    font-size: 0.9rem;
+    padding: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .field-inputs {
+    grid-template-columns: 1.5fr 140px 1.5fr;
+    gap: 1.5rem;
+  }
+  
+  .field-row {
+    padding: 1.25rem;
   }
 }

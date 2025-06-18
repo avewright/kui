@@ -20,6 +20,25 @@ function App() {
   // New state for model selection
   const [selectedModel, setSelectedModel] = useState(null);
   const [showModelSelection, setShowModelSelection] = useState(false);
+  
+  // New state for field configuration
+  const [showFieldConfiguration, setShowFieldConfiguration] = useState(false);
+  const [extractionFields, setExtractionFields] = useState([
+    { field_name: 'asset_number', field_type: 'text', field_mapping: 'asset_number_field' },
+    { field_name: 'model', field_type: 'text', field_mapping: 'model_field' },
+    { field_name: 'serial_number', field_type: 'text', field_mapping: 'serial_number_field' }
+  ]);
+  const [fileType, setFileType] = useState(null); // 'pdf', 'image'
+
+  // Helper function to check if file is image
+  const isImageFile = (file) => {
+    return file && ['image/png', 'image/jpeg', 'image/jpg'].includes(file.type);
+  };
+
+  // Helper function to check if file is PDF
+  const isPdfFile = (file) => {
+    return file && file.type === 'application/pdf';
+  };
 
   // Reset current page when new images load
   useEffect(() => {
@@ -43,16 +62,28 @@ function App() {
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === 'application/pdf') {
+      if (isPdfFile(droppedFile)) {
         setFile(droppedFile);
+        setFileType('pdf');
         setShowModelSelection(true);
         setSelectedModel(null);
+        setShowFieldConfiguration(false);
+        // Clear any previous results
+        setImageResults([]);
+        setMetadata([]);
+        setError(null);
+      } else if (isImageFile(droppedFile)) {
+        setFile(droppedFile);
+        setFileType('image');
+        setShowModelSelection(true);
+        setSelectedModel(null);
+        setShowFieldConfiguration(false);
         // Clear any previous results
         setImageResults([]);
         setMetadata([]);
         setError(null);
       } else {
-        alert('Please upload a PDF file');
+        alert('Please upload a PDF file or image (PNG, JPG, JPEG)');
       }
     }
   };
@@ -60,16 +91,28 @@ function App() {
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.type === 'application/pdf') {
+      if (isPdfFile(selectedFile)) {
         setFile(selectedFile);
+        setFileType('pdf');
         setShowModelSelection(true);
         setSelectedModel(null);
+        setShowFieldConfiguration(false);
+        // Clear any previous results
+        setImageResults([]);
+        setMetadata([]);
+        setError(null);
+      } else if (isImageFile(selectedFile)) {
+        setFile(selectedFile);
+        setFileType('image');
+        setShowModelSelection(true);
+        setSelectedModel(null);
+        setShowFieldConfiguration(false);
         // Clear any previous results
         setImageResults([]);
         setMetadata([]);
         setError(null);
       } else {
-        alert('Please upload a PDF file');
+        alert('Please upload a PDF file or image (PNG, JPG, JPEG)');
       }
     }
   };
@@ -105,8 +148,70 @@ function App() {
       setError("Please select a model type before starting inference.");
       return;
     }
-    setShowModelSelection(false);
-    uploadFileToAPI(selectedModel);
+    
+    // If asset extraction is selected, show field configuration
+    if (selectedModel === 'asset') {
+      setShowModelSelection(false);
+      setShowFieldConfiguration(true);
+    } else {
+      // For drawing extraction, go directly to processing
+      setShowModelSelection(false);
+      uploadFileToAPI(selectedModel);
+    }
+  };
+
+  // Field configuration functions
+  const addField = () => {
+    setExtractionFields([...extractionFields, { 
+      field_name: '', 
+      field_type: 'text', 
+      field_mapping: '' 
+    }]);
+  };
+
+  const removeField = (index) => {
+    setExtractionFields(extractionFields.filter((_, i) => i !== index));
+  };
+
+  const updateField = (index, property, value) => {
+    const updated = [...extractionFields];
+    updated[index][property] = value;
+    setExtractionFields(updated);
+  };
+
+  const addPresetField = (preset) => {
+    const presets = {
+      asset_number: { field_name: 'asset_number', field_type: 'text', field_mapping: 'asset_number_field' },
+      model: { field_name: 'model', field_type: 'text', field_mapping: 'model_field' },
+      serial_number: { field_name: 'serial_number', field_type: 'text', field_mapping: 'serial_number_field' },
+      manufacturer: { field_name: 'manufacturer', field_type: 'text', field_mapping: 'manufacturer_field' },
+      description: { field_name: 'description', field_type: 'text', field_mapping: 'description_field' },
+      asset_type: { field_name: 'asset_type', field_type: 'text', field_mapping: 'asset_type_field' }
+    };
+    
+    if (presets[preset]) {
+      setExtractionFields([...extractionFields, presets[preset]]);
+    }
+  };
+
+  const startAssetExtraction = () => {
+    if (extractionFields.length === 0) {
+      setError("Please add at least one field to extract.");
+      return;
+    }
+    
+    // Validate fields
+    const isValid = extractionFields.every(field => 
+      field.field_name.trim() && field.field_mapping.trim()
+    );
+    
+    if (!isValid) {
+      setError("Please fill in all field names and mappings.");
+      return;
+    }
+    
+    setShowFieldConfiguration(false);
+    uploadFileToAPI('asset');
   };
 
   const uploadFileToAPI = async (modelType = 'drawing') => {
@@ -124,34 +229,45 @@ function App() {
     setAiProcessingId(null);
   
     try {
-      // Also get basic PDF info for image conversion first
-      const infoResponse = await fetch('http://127.0.0.1:8080/pdf_info', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!infoResponse.ok) {
-        const errorData = await infoResponse.text();
-        throw new Error(errorData || "Failed to get PDF info");
-      }
-      
-      const info = await infoResponse.json();
-      setPdfInfo(info);
-      
-      // Handle different model types
-      if (modelType === 'asset') {
-        // For asset/receipt extraction, process each page individually
-        console.log("🚀 Starting Asset/Receipt extraction...");
-        await processAssetExtraction(info);
+      // Handle different file types
+      if (fileType === 'image') {
+        // For images, process directly with asset extraction
+        if (modelType === 'asset') {
+          console.log("🚀 Starting Asset extraction on image...");
+          await processImageAssetExtraction();
+        } else {
+          throw new Error("Drawing metadata extraction is only available for PDF files.");
+        }
       } else {
-        // Original drawing metadata extraction flow
-        console.log("🚀 Starting Drawing metadata extraction...");
-        await processDrawingExtraction(info, formData);
+        // For PDFs, get basic PDF info first
+        const infoResponse = await fetch('http://127.0.0.1:8080/pdf_info', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!infoResponse.ok) {
+          const errorData = await infoResponse.text();
+          throw new Error(errorData || "Failed to get PDF info");
+        }
+        
+        const info = await infoResponse.json();
+        setPdfInfo(info);
+        
+        // Handle different model types for PDFs
+        if (modelType === 'asset') {
+          // For asset/receipt extraction, process each page individually
+          console.log("🚀 Starting Asset/Receipt extraction...");
+          await processAssetExtraction(info);
+        } else {
+          // Original drawing metadata extraction flow
+          console.log("🚀 Starting Drawing metadata extraction...");
+          await processDrawingExtraction(info, formData);
+        }
       }
 
     } catch (error) {
       console.error("Upload error:", error);
-      setError(error.message || "Failed to process the PDF. Please try again.");
+      setError(error.message || "Failed to process the file. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -181,6 +297,56 @@ function App() {
           return updated;
         });
       }
+    }
+  };
+
+  const processImageAssetExtraction = async () => {
+    console.log("🚀 Starting image asset extraction...");
+    
+    // For images, we have a single "page"
+    setImageResults([null]);
+    setMetadata([null]);
+    setPageLoadingStates([true]);
+    setLoadingProgress({ loaded: 0, total: 1 });
+
+    try {
+      // Convert file to base64 for display
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result.split(',')[1]; // Remove data URL prefix
+        
+        console.log("📷 Image converted to base64, length:", base64Data.length);
+        
+        // Set the image for display
+        setImageResults([base64Data]);
+        
+        // Extract asset metadata
+        console.log("🔍 Calling extractAssetMetadata...");
+        const assetData = await extractAssetMetadata(base64Data);
+        
+        console.log("📊 Asset data received:", assetData);
+        
+        // Convert asset response to our internal format
+        const pageMetadata = {
+          type: 'asset',
+          fields: assetData || {},
+          isEdited: false,
+          isAiGenerated: true
+        };
+
+        console.log("📋 Final metadata object:", pageMetadata);
+
+        setMetadata([pageMetadata]);
+        setPageLoadingStates([false]);
+        setLoadingProgress({ loaded: 1, total: 1 });
+        
+        console.log("✅ Image asset extraction completed");
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("❌ Error processing image:", error);
+      setPageLoadingStates([false]);
+      setError("Failed to process the image. Please try again.");
     }
   };
 
@@ -410,41 +576,16 @@ function App() {
       const formData = new FormData();
       formData.append('file', blob, 'page.png');
       
-      // Define default fields for asset extraction
+      // Use configured fields for asset extraction
       const assetInput = {
-        fields: [
-          {
-            field_name: "asset_number",
-            field_type: "text",
-            field_mapping: "asset_number_field"
-          },
-          {
-            field_name: "asset_type",
-            field_type: "text", 
-            field_mapping: "asset_type_field"
-          },
-          {
-            field_name: "description",
-            field_type: "text",
-            field_mapping: "description_field"
-          },
-          {
-            field_name: "manufacturer",
-            field_type: "text",
-            field_mapping: "manufacturer_field"
-          },
-          {
-            field_name: "model",
-            field_type: "text",
-            field_mapping: "model_field"
-          },
-          {
-            field_name: "serial_number",
-            field_type: "text",
-            field_mapping: "serial_number_field"
-          }
-        ]
+        fields: extractionFields.map(field => ({
+          field_name: field.field_name,
+          field_type: field.field_type,
+          field_mapping: field.field_mapping
+        }))
       };
+
+      console.log("🔍 Sending asset extraction request with fields:", assetInput);
 
       // Add the input fields as JSON string in form data (based on API design)
       formData.append('input', JSON.stringify(assetInput));
@@ -454,20 +595,64 @@ function App() {
         body: formData
       });
 
+      console.log("📡 Asset extraction response status:", response.status);
+
       if (response.ok) {
         const responseText = await response.text();
+        console.log("📄 Raw response text:", responseText);
+        
         try {
-          return JSON.parse(responseText);
-        } catch {
-          // If it's not JSON, return as a simple text response
-          return { extracted_text: responseText };
+          const parsedData = JSON.parse(responseText);
+          console.log("✅ Parsed asset data:", parsedData);
+          
+          // Convert field mappings back to field names for display
+          const displayData = {};
+          extractionFields.forEach(field => {
+            const mappingKey = field.field_mapping;
+            const displayKey = field.field_name;
+            if (parsedData[mappingKey]) {
+              displayData[displayKey] = parsedData[mappingKey];
+            }
+          });
+          
+          console.log("🔄 Converted to display format:", displayData);
+          return displayData;
+        } catch (parseError) {
+          console.error("❌ Failed to parse JSON response:", parseError);
+          console.log("📄 Response was:", responseText);
+          
+          // Try to handle string representation of dict (fallback)
+          try {
+            // If response is a string representation of a Python dict
+            const cleanedResponse = responseText.replace(/'/g, '"');
+            const parsedData = JSON.parse(cleanedResponse);
+            console.log("✅ Parsed as cleaned dict:", parsedData);
+            
+            // Convert field mappings back to field names for display
+            const displayData = {};
+            extractionFields.forEach(field => {
+              const mappingKey = field.field_mapping;
+              const displayKey = field.field_name;
+              if (parsedData[mappingKey]) {
+                displayData[displayKey] = parsedData[mappingKey];
+              }
+            });
+            
+            console.log("🔄 Converted to display format:", displayData);
+            return displayData;
+          } catch (secondParseError) {
+            console.error("❌ Failed to parse cleaned response:", secondParseError);
+            // If it's not JSON, return as a simple text response
+            return { extracted_text: responseText };
+          }
         }
       } else {
-        console.warn("Asset extraction failed, using fallback");
+        const errorText = await response.text();
+        console.error("❌ Asset extraction failed with status:", response.status, "Error:", errorText);
         return null;
       }
     } catch (error) {
-      console.error("Error extracting asset metadata:", error);
+      console.error("❌ Error extracting asset metadata:", error);
       return null;
     }
   };
@@ -550,8 +735,6 @@ function App() {
       }));
     }
   };
-
-
 
   const cleanupPdf = async () => {
     if (pdfInfo?.pdf_id) {
@@ -682,7 +865,7 @@ function App() {
 
   return (
     <div className={`App ${imageResults.length > 0 ? 'with-images' : ''}`}>
-      <div className="container">
+      <div className={`container ${showFieldConfiguration ? 'field-config-mode' : ''}`}>
         {/* <div className="logo-container">
         </div> */}
         <h1><img src={logo} className="kahua-logo" style={{width: "66%", height: "66%"}} alt="Kahua Logo" /></h1>
@@ -717,7 +900,7 @@ function App() {
                 <p className="file-size">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
             ) : (
-              <p>Drag & drop your PDF here or</p>
+              <p>Drag & drop your PDF or image here or</p>
             )}
             
             <button className="browse-button" onClick={handleBrowseClick}>
@@ -728,7 +911,7 @@ function App() {
               type="file" 
               ref={fileInputRef} 
               onChange={handleFileChange} 
-              accept=".pdf,application/pdf" 
+              accept=".pdf,application/pdf,.png,image/png,.jpg,.jpeg,image/jpeg" 
               style={{ display: 'none' }} 
             />
           </div>
@@ -751,12 +934,13 @@ function App() {
         {file && showModelSelection && !isUploading && (
           <div className="model-selection">
             <h2>Choose Processing Model</h2>
-            <p>Select the type of extraction you want to perform on your PDF:</p>
+            <p>Select the type of extraction you want to perform on your {fileType === 'image' ? 'image' : 'PDF'}:</p>
             
             <div className="model-options">
               <div 
-                className={`model-option ${selectedModel === 'drawing' ? 'selected' : ''}`}
-                onClick={() => handleModelSelect('drawing')}
+                className={`model-option ${selectedModel === 'drawing' ? 'selected' : ''} ${fileType === 'image' ? 'disabled' : ''}`}
+                onClick={() => fileType !== 'image' && handleModelSelect('drawing')}
+                style={{ opacity: fileType === 'image' ? 0.5 : 1, cursor: fileType === 'image' ? 'not-allowed' : 'pointer' }}
               >
                 <div className="model-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -768,7 +952,7 @@ function App() {
                   </svg>
                 </div>
                 <h3>Drawing Metadata</h3>
-                <p>Extract technical drawing information including titles, drawing numbers, and revision history.</p>
+                <p>{fileType === 'image' ? 'Only available for PDF files' : 'Extract technical drawing information including titles, drawing numbers, and revision history.'}</p>
               </div>
               
               <div 
@@ -797,6 +981,112 @@ function App() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
+              </button>
+              <button className="clear-button" onClick={clearFile}>Clear</button>
+            </div>
+          </div>
+        )}
+
+        {/* Field Configuration UI */}
+        {file && showFieldConfiguration && !isUploading && (
+          <div className="field-configuration">
+            <h2>Configure Extraction Fields</h2>
+            <p>Specify which fields you want to extract from your asset plate or receipt:</p>
+            
+            <div className="preset-fields">
+              <h3>Quick Add Presets:</h3>
+              <div className="preset-buttons">
+                {['asset_number', 'model', 'serial_number', 'manufacturer', 'description', 'asset_type'].map(preset => (
+                  <button 
+                    key={preset}
+                    className="preset-button"
+                    onClick={() => addPresetField(preset)}
+                  >
+                    Add {preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="extraction-fields">
+              <h3>Extraction Fields:</h3>
+              {extractionFields.map((field, index) => (
+                <div key={index} className="field-row">
+                  <div className="field-inputs">
+                    <div className="field-input-group">
+                      <label>Field Name:</label>
+                      <input
+                        type="text"
+                        value={field.field_name}
+                        onChange={(e) => updateField(index, 'field_name', e.target.value)}
+                        placeholder="e.g., asset_number"
+                        className="field-input"
+                      />
+                    </div>
+                    <div className="field-input-group">
+                      <label>Field Type:</label>
+                      <select
+                        value={field.field_type}
+                        onChange={(e) => updateField(index, 'field_type', e.target.value)}
+                        className="field-select"
+                      >
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                      </select>
+                    </div>
+                    <div className="field-input-group">
+                      <label>Field Mapping:</label>
+                      <input
+                        type="text"
+                        value={field.field_mapping}
+                        onChange={(e) => updateField(index, 'field_mapping', e.target.value)}
+                        placeholder="e.g., asset_number_field"
+                        className="field-input"
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    className="remove-field-button"
+                    onClick={() => removeField(index)}
+                    title="Remove field"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              
+              <button className="add-field-button" onClick={addField}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Custom Field
+              </button>
+            </div>
+
+            <div className="field-configuration-actions">
+              <button 
+                className="start-extraction-button" 
+                onClick={startAssetExtraction}
+                disabled={extractionFields.length === 0}
+              >
+                <span>Start Extraction</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+              <button 
+                className="back-button" 
+                onClick={() => {
+                  setShowFieldConfiguration(false);
+                  setShowModelSelection(true);
+                }}
+              >
+                Back
               </button>
               <button className="clear-button" onClick={clearFile}>Clear</button>
             </div>
