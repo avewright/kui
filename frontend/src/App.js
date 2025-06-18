@@ -16,6 +16,10 @@ function App() {
   const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
   const [currentVisiblePage, setCurrentVisiblePage] = useState(0);
   const carouselRef = useRef(null);
+  
+  // New state for model selection
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [showModelSelection, setShowModelSelection] = useState(false);
 
   // Reset current page when new images load
   useEffect(() => {
@@ -23,8 +27,6 @@ function App() {
       setCurrentVisiblePage(0);
     }
   }, [imageResults.length]);
-
-
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -43,6 +45,12 @@ function App() {
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile.type === 'application/pdf') {
         setFile(droppedFile);
+        setShowModelSelection(true);
+        setSelectedModel(null);
+        // Clear any previous results
+        setImageResults([]);
+        setMetadata([]);
+        setError(null);
       } else {
         alert('Please upload a PDF file');
       }
@@ -54,6 +62,12 @@ function App() {
       const selectedFile = e.target.files[0];
       if (selectedFile.type === 'application/pdf') {
         setFile(selectedFile);
+        setShowModelSelection(true);
+        setSelectedModel(null);
+        // Clear any previous results
+        setImageResults([]);
+        setMetadata([]);
+        setError(null);
       } else {
         alert('Please upload a PDF file');
       }
@@ -82,7 +96,20 @@ function App() {
 
   const [aiProcessingId, setAiProcessingId] = useState(null);
 
-  const uploadFileToAPI = async () => {
+  const handleModelSelect = (modelType) => {
+    setSelectedModel(modelType);
+  };
+
+  const startInference = () => {
+    if (!selectedModel) {
+      setError("Please select a model type before starting inference.");
+      return;
+    }
+    setShowModelSelection(false);
+    uploadFileToAPI(selectedModel);
+  };
+
+  const uploadFileToAPI = async (modelType = 'drawing') => {
     if (!file) return;
   
     const formData = new FormData();
@@ -423,6 +450,8 @@ function App() {
     setPageLoadingStates([]);
     setLoadingProgress({ loaded: 0, total: 0 });
     setError(null);
+    setShowModelSelection(false);
+    setSelectedModel(null);
   };
 
   const goToNextPage = () => {
@@ -497,16 +526,72 @@ function App() {
           </div>
         </div>
         
-        {file && imageResults.length === 0 && (
+        {file && imageResults.length === 0 && !showModelSelection && (
           <div className="action-buttons">
             <button 
               className="upload-button" 
-              onClick={uploadFileToAPI}
+              onClick={() => uploadFileToAPI('drawing')}
               disabled={isUploading}
             >
               {isUploading ? 'Processing...' : 'Extract Metadata'}
             </button>
             <button className="clear-button" onClick={clearFile}>Clear</button>
+          </div>
+        )}
+
+        {/* Model Selection UI */}
+        {file && showModelSelection && !isUploading && (
+          <div className="model-selection">
+            <h2>Choose Processing Model</h2>
+            <p>Select the type of extraction you want to perform on your PDF:</p>
+            
+            <div className="model-options">
+              <div 
+                className={`model-option ${selectedModel === 'drawing' ? 'selected' : ''}`}
+                onClick={() => handleModelSelect('drawing')}
+              >
+                <div className="model-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <h3>Drawing Metadata</h3>
+                <p>Extract technical drawing information including titles, drawing numbers, and revision history.</p>
+              </div>
+              
+              <div 
+                className={`model-option ${selectedModel === 'asset' ? 'selected' : ''}`}
+                onClick={() => handleModelSelect('asset')}
+              >
+                <div className="model-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                </div>
+                <h3>Asset Plate/Receipt</h3>
+                <p>Extract asset information from plates, tags, and receipts including asset numbers and details.</p>
+              </div>
+            </div>
+            
+            <div className="model-selection-actions">
+              <button 
+                className="start-inference-button" 
+                onClick={startInference}
+                disabled={!selectedModel}
+              >
+                <span>Start Inference</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+              <button className="clear-button" onClick={clearFile}>Clear</button>
+            </div>
           </div>
         )}
         
@@ -521,10 +606,10 @@ function App() {
           <div className="loaded-state-actions">
             <button 
               className="upload-button" 
-              onClick={uploadFileToAPI}
+              onClick={() => uploadFileToAPI(selectedModel || 'drawing')}
               disabled={isUploading}
             >
-              {isUploading ? 'Processing...' : 'Extract Metadata'}
+              {isUploading ? 'Processing...' : 'Re-extract Metadata'}
             </button>
             <button className="clear-button" onClick={clearResults}>
               Clear Results
