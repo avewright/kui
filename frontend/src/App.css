@@ -1832,60 +1832,58 @@ button {
   margin-bottom: 2rem;
 }
 
-/* NEW: Unified Image + Metadata Layout - Always Vertical Stack */
+/* Grid container for image + metadata */
 .image-metadata-container {
-  display: flex;
-  flex-direction: column;
-  min-height: 400px;
-  max-height: 85vh;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: calc(100vh - 4rem);
+  transition: grid-template-columns 0.3s ease-in-out;
 }
 
-/* Image section - flexible but can shrink */
-.image-section {
-  flex: 1 1 auto;
-  min-height: 200px;
-  max-height: 50vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+/* Focus modes */
+.image-metadata-container.focus-image {
+  grid-template-columns: 1fr 0fr;
 }
 
-/* Metadata section - gets remaining space with minimum */
+.image-metadata-container.focus-meta {
+  grid-template-columns: 0fr 1fr;
+}
+
+/* Ensure full-fit sections */
+.image-section,
 .metadata-section {
-  flex: 1 1 auto;
-  min-height: 300px;
-  border-top: 1px solid var(--border-color);
-  border-left: none;
-  overflow-y: auto;
+  height: 100%;
 }
 
-/* Image Section Styling - Updated for horizontal layout */
+/* Image section styling */
 .image-section {
-  padding: 1rem;
   background: var(--bg-lighter);
-  position: relative;
-}
-
-.image-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.image-section img {
   width: 100%;
   height: 100%;
-  max-height: 100%;
-}
-
-.image-wrapper img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
+  object-fit: contain; /* never crops */
   border-radius: var(--radius);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 1rem;
+  max-width: calc(100% - 2rem);
+  max-height: calc(100% - 2rem);
 }
+
+/* Scrollable metadata */
+.metadata-section {
+  background: white;
+  border-left: 1px solid var(--border-color);
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+
 
 /* Metadata Section Styling */
 .metadata-section {
@@ -1916,19 +1914,31 @@ button {
   background-color: var(--primary-dark);
 }
 
-/* Responsive adjustments for all screen sizes */
+/* Responsive adjustments - stack vertically on smaller screens */
 @media (max-width: 1023px) {
-  .metadata-content {
+  .image-metadata-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: calc(100vh - 2rem);
+  }
+  
+  .image-metadata-container.focus-image {
+    grid-template-rows: 1fr 0fr;
     grid-template-columns: 1fr;
   }
   
-  .image-section {
-    max-height: 40vh;
-    min-height: 180px;
+  .image-metadata-container.focus-meta {
+    grid-template-rows: 0fr 1fr;
+    grid-template-columns: 1fr;
   }
   
   .metadata-section {
-    min-height: 250px;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  
+  .metadata-content {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1940,18 +1950,12 @@ button {
     border-right: none;
   }
   
-  .image-section {
-    padding: 0.75rem;
-    max-height: 35vh;
-    min-height: 150px;
-  }
-  
-  .metadata-panel {
-    padding: 1rem;
+  .image-metadata-container {
+    height: calc(100vh - 1rem);
   }
   
   .metadata-section {
-    min-height: 200px;
+    padding: 0.75rem;
   }
   
   .metadata-header {
@@ -1959,10 +1963,6 @@ button {
     gap: 1rem;
     text-align: center;
     align-items: center;
-  }
-  
-  .image-metadata-container {
-    max-height: 90vh;
   }
 }
 
@@ -1986,40 +1986,60 @@ button {
   min-height: auto;
 }
 
-/* Large screen optimizations for vertical layout */
+/* Large screen optimizations for grid layout */
 @media (min-width: 1024px) {
-  .image-metadata-container {
-    max-height: 90vh;
-  }
-  
-  .image-section {
-    max-height: 45vh;
-    min-height: 250px;
-  }
-  
-  .metadata-section {
-    min-height: 350px;
-    flex: 1 1 auto;
-  }
-  
   .metadata-content {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.5rem;
   }
 }
 
 @media (min-width: 1400px) {
-  .image-section {
-    max-height: 50vh;
-    min-height: 300px;
-  }
-  
-  .metadata-section {
-    min-height: 400px;
+  .image-metadata-container {
+    height: 90vh;
   }
   
   .metadata-content {
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 2rem;
   }
+}
+
+/* Sticky focus buttons */
+.focus-controls {
+  position: sticky;
+  top: 0;
+  background: white;
+  display: flex;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  z-index: 10;
+  margin-bottom: 1rem;
+}
+
+.focus-controls button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.focus-controls button:hover {
+  background: var(--bg-lighter);
+  border-color: var(--primary);
+}
+
+.focus-controls button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.focus-controls button.active:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
 }

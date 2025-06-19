@@ -29,6 +29,9 @@ function App() {
     { field_name: 'serial_number', field_type: 'text', field_mapping: 'serial_number_field' }
   ]);
   const [fileType, setFileType] = useState(null); // 'pdf', 'image'
+  
+  // Focus mode state
+  const [focusMode, setFocusMode] = useState('normal'); // 'normal', 'image', 'meta'
 
   // Helper function to check if file is image
   const isImageFile = (file) => {
@@ -45,6 +48,27 @@ function App() {
     if (imageResults.length > 0) {
       setCurrentVisiblePage(0);
     }
+  }, [imageResults.length]);
+
+  // Keyboard shortcuts for focus modes
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (imageResults.length === 0) return;
+      
+      // Only trigger if not typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      if (e.key === '1' || e.key === 'i') {
+        setFocusMode(prev => prev === 'image' ? 'normal' : 'image');
+      } else if (e.key === '2' || e.key === 'm') {
+        setFocusMode(prev => prev === 'meta' ? 'normal' : 'meta');
+      } else if (e.key === 'Escape') {
+        setFocusMode('normal');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
   }, [imageResults.length]);
 
   const handleDragOver = (e) => {
@@ -1256,19 +1280,32 @@ function App() {
                   </div>
                 ) : imageResults[currentVisiblePage] ? (
                   <div className="page-content-card">
-                    <div className="image-metadata-container">
+                    <div className={`image-metadata-container ${focusMode === 'image' ? 'focus-image' : focusMode === 'meta' ? 'focus-meta' : ''}`}>
                       <div className="image-section">
-                        <div className="image-wrapper">
-                          <img 
-                            src={`data:image/png;base64,${imageResults[currentVisiblePage]}`} 
-                            alt={`Page ${currentVisiblePage + 1}`}
-                            loading="lazy"
-                          />
-                        </div>
+                        <img 
+                          src={`data:image/png;base64,${imageResults[currentVisiblePage]}`} 
+                          alt={`Page ${currentVisiblePage + 1}`}
+                          loading="lazy"
+                        />
                       </div>
                       
                       {metadata[currentVisiblePage] && (
                         <div className="metadata-section">
+                          <div className="focus-controls">
+                            <button
+                              className={focusMode === 'image' ? 'active' : ''}
+                              onClick={() => setFocusMode(focusMode === 'image' ? 'normal' : 'image')}
+                            >
+                              🖼️ Image
+                            </button>
+                            <button
+                              className={focusMode === 'meta' ? 'active' : ''}
+                              onClick={() => setFocusMode(focusMode === 'meta' ? 'normal' : 'meta')}
+                            >
+                              📊 Meta
+                            </button>
+                          </div>
+
                           <div className="metadata-panel">
                             <div className="metadata-header">
                               <h3>
