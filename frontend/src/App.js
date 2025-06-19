@@ -530,6 +530,10 @@ function App() {
 
       // For asset extraction, call the asset plate extraction API
       const assetData = await extractAssetMetadata(pageData.image);
+      console.log("🔍 FRONTEND Asset data returned from extraction:", assetData);
+      console.log("📊 FRONTEND Asset data type:", typeof assetData);
+      console.log("📊 FRONTEND Asset data is null?", assetData === null);
+      console.log("📊 FRONTEND Asset data is undefined?", assetData === undefined);
       
       // Convert asset response to our internal format
       const pageMetadata = {
@@ -538,10 +542,17 @@ function App() {
         isEdited: false,
         isAiGenerated: true
       };
+      
+      console.log("🔍 FRONTEND Page metadata created:", pageMetadata);
+      console.log("📊 FRONTEND Page metadata fields:", pageMetadata.fields);
+      console.log("📊 FRONTEND Page metadata fields type:", typeof pageMetadata.fields);
+      console.log("📊 FRONTEND Page metadata fields keys:", Object.keys(pageMetadata.fields));
+      console.log("📊 FRONTEND Page metadata fields count:", Object.keys(pageMetadata.fields).length);
 
       setMetadata(prev => {
         const updated = [...prev];
         updated[pageIndex] = pageMetadata;
+        console.log("🔍 FRONTEND Updated metadata array at index", pageIndex, ":", updated[pageIndex]);
         return updated;
       });
 
@@ -599,52 +610,81 @@ function App() {
 
       if (response.ok) {
         const responseText = await response.text();
-        console.log("📄 Raw response text:", responseText);
+        console.log("📄 FRONTEND Raw response text:", responseText);
+        console.log("📏 FRONTEND Response length:", responseText.length);
         
+        let parsedData;
+        
+        // The response is a JSON string containing a Python dict string
+        // We need to first parse the JSON to get the actual dict string, then parse that
         try {
-          const parsedData = JSON.parse(responseText);
-          console.log("✅ Parsed asset data:", parsedData);
+          console.log("🔍 FRONTEND Raw response analysis:");
+          console.log("📄 Type:", typeof responseText);
+          console.log("📄 First char:", responseText[0]);
+          console.log("📄 Last char:", responseText[responseText.length - 1]);
+          console.log("📄 First 50 chars:", responseText.substring(0, 50));
+          
+          // Check if response is a JSON-encoded string containing a Python dict
+          if (responseText.startsWith('"') && responseText.endsWith('"')) {
+            // It's a JSON string, parse it to get the actual content
+            const actualContent = JSON.parse(responseText);
+            console.log("🔧 FRONTEND Extracted content from JSON string:", actualContent);
+            console.log("🔧 FRONTEND Content type:", typeof actualContent);
+            
+            // Now convert Python dict format to JSON
+            const cleanedResponse = actualContent.replace(/'/g, '"');
+            parsedData = JSON.parse(cleanedResponse);
+            console.log("✅ FRONTEND Parsed Python dict as JSON:", parsedData);
+          } else {
+            // Try direct parsing first
+            try {
+              parsedData = JSON.parse(responseText);
+              console.log("✅ FRONTEND Parsed as direct JSON:", parsedData);
+            } catch (jsonError) {
+              console.log("⚠️ FRONTEND Not valid JSON, trying Python dict format...");
+              // Convert Python dict format to JSON
+              const cleanedResponse = responseText.replace(/'/g, '"');
+              parsedData = JSON.parse(cleanedResponse);
+              console.log("✅ FRONTEND Parsed as Python dict:", parsedData);
+            }
+          }
+          
+          console.log("📊 FRONTEND Parsed data type:", typeof parsedData);
+          console.log("📊 FRONTEND Parsed data keys:", Object.keys(parsedData));
+          console.log("📊 FRONTEND Parsed data key count:", Object.keys(parsedData).length);
+          
+          // Log current extraction fields configuration
+          console.log("🔍 FRONTEND Current extraction fields:", extractionFields);
           
           // Convert field mappings back to field names for display
           const displayData = {};
-          extractionFields.forEach(field => {
+          extractionFields.forEach((field, index) => {
             const mappingKey = field.field_mapping;
             const displayKey = field.field_name;
-            if (parsedData[mappingKey]) {
+            console.log(`🔄 FRONTEND Processing field ${index}: mapping='${mappingKey}' -> display='${displayKey}'`);
+            
+            if (parsedData.hasOwnProperty(mappingKey)) {
               displayData[displayKey] = parsedData[mappingKey];
+              console.log(`✅ FRONTEND Found data: '${displayKey}' = '${parsedData[mappingKey]}'`);
+            } else {
+              console.log(`❌ FRONTEND Missing mapping key '${mappingKey}' in response`);
+              console.log(`🔍 FRONTEND Available keys:`, Object.keys(parsedData));
             }
           });
           
-          console.log("🔄 Converted to display format:", displayData);
+          console.log("🔄 FRONTEND Converted to display format:", displayData);
+          console.log("📊 FRONTEND Display data keys:", Object.keys(displayData));
+          console.log("📊 FRONTEND Display data key count:", Object.keys(displayData).length);
           return displayData;
-        } catch (parseError) {
-          console.error("❌ Failed to parse JSON response:", parseError);
-          console.log("📄 Response was:", responseText);
           
-          // Try to handle string representation of dict (fallback)
-          try {
-            // If response is a string representation of a Python dict
-            const cleanedResponse = responseText.replace(/'/g, '"');
-            const parsedData = JSON.parse(cleanedResponse);
-            console.log("✅ Parsed as cleaned dict:", parsedData);
-            
-            // Convert field mappings back to field names for display
-            const displayData = {};
-            extractionFields.forEach(field => {
-              const mappingKey = field.field_mapping;
-              const displayKey = field.field_name;
-              if (parsedData[mappingKey]) {
-                displayData[displayKey] = parsedData[mappingKey];
-              }
-            });
-            
-            console.log("🔄 Converted to display format:", displayData);
-            return displayData;
-          } catch (secondParseError) {
-            console.error("❌ Failed to parse cleaned response:", secondParseError);
-            // If it's not JSON, return as a simple text response
-            return { extracted_text: responseText };
-          }
+        } catch (parseError) {
+          console.error("❌ Failed to parse response:", parseError);
+          console.log("📄 Raw response was:", responseText);
+          console.log("📏 Response length:", responseText.length);
+          console.log("📋 Response first 100 chars:", responseText.substring(0, 100));
+          
+          // If all parsing fails, return as a simple text response
+          return { extracted_text: responseText };
         }
       } else {
         const errorText = await response.text();
@@ -1231,27 +1271,35 @@ function App() {
                           <h3>
                             {metadata[currentVisiblePage]?.type === 'asset' ? 'Asset Information' : 'Drawing Metadata'}
                           </h3>
-                          {editingIndex === currentVisiblePage ? (
-                            <button className="small-button" onClick={stopEditing}>Done</button>
-                          ) : (
-                            <button className="small-button" onClick={() => startEditing(currentVisiblePage)}>Edit</button>
-                          )}
+                          <div className="header-actions">
+                            {metadata[currentVisiblePage]?.type === 'asset' && (
+                              <div className="status-badge">
+                                ✓ {metadata[currentVisiblePage]?.isAiGenerated ? 'AI Extracted' : 'Manual Entry'}
+                              </div>
+                            )}
+                            {editingIndex === currentVisiblePage ? (
+                              <button className="small-button" onClick={stopEditing}>Done</button>
+                            ) : (
+                              <button className="small-button" onClick={() => startEditing(currentVisiblePage)}>Edit</button>
+                            )}
+                          </div>
                         </div>
                         
                         {metadata[currentVisiblePage]?.type === 'asset' ? (
-                          <div className="asset-metadata-content">
+                          <div className="metadata-content">
                             {Object.entries(metadata[currentVisiblePage]?.fields || {}).map(([key, value]) => (
-                              <div key={key} className="asset-field">
+                              <div key={key} className="metadata-field">
                                 <label>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
                                 {editingIndex === currentVisiblePage ? (
                                   <input
                                     type="text"
                                     value={value || ''}
                                     onChange={(e) => handleAssetFieldEdit(currentVisiblePage, key, e.target.value)}
-                                    className="asset-input"
+                                    className="metadata-input"
+                                    placeholder={`Enter ${key.replace(/_/g, ' ').toLowerCase()}...`}
                                   />
                                 ) : (
-                                  <div className="asset-value-container">
+                                  <div className="metadata-value-container">
                                     <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
                                       {value || 'Not detected'}
                                     </p>
@@ -1261,7 +1309,7 @@ function App() {
                             ))}
                             {(!metadata[currentVisiblePage]?.fields || Object.keys(metadata[currentVisiblePage].fields).length === 0) && (
                               <div className="no-data-message">
-                                <p>No asset information was extracted from this page.</p>
+                                <p>No asset information was extracted from this image.</p>
                               </div>
                             )}
                           </div>
@@ -1308,10 +1356,10 @@ function App() {
                               {editingIndex === currentVisiblePage ? (
                                 <div className="revision-table">
                                   <div className="revision-row">
-                                    <div className="revision-cell">ID</div>
-                                    <div className="revision-cell">Description</div>
-                                    <div className="revision-cell">Date</div>
-                                    <div className="revision-cell">Actions</div>
+                                    <div className="revision-cell table-header">ID</div>
+                                    <div className="revision-cell table-header">Description</div>
+                                    <div className="revision-cell table-header">Date</div>
+                                    <div className="revision-cell table-header">Actions</div>
                                   </div>
                                   {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
                                     <div key={revisionIndex} className="revision-row">
@@ -1357,9 +1405,9 @@ function App() {
                               ) : (
                                 <div className="revision-table">
                                   <div className="revision-row">
-                                    <div className="revision-cell">ID</div>
-                                    <div className="revision-cell">Description</div>
-                                    <div className="revision-cell">Date</div>
+                                    <div className="revision-cell table-header">ID</div>
+                                    <div className="revision-cell table-header">Description</div>
+                                    <div className="revision-cell table-header">Date</div>
                                   </div>
                                   {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
                                     <div key={revisionIndex} className="revision-row">

@@ -261,18 +261,41 @@ class AIServiceClient:
             files = {"file": (filename, file_content, "image/jpeg" if filename.lower().endswith(('.jpg', '.jpeg', '.png')) else "application/pdf")}
             form_data = {"input": json.dumps({"fields": fields})}
             
+            logger.info(f"🔗 Sending asset extraction request to {self.base_url}/asset_plate_extract")
+            logger.info(f"📦 Request files: {list(files.keys())}")
+            logger.info(f"📝 Request form_data: {form_data}")
+            logger.info(f"🔧 Request timeout: {self.timeout}s")
+            logger.info(f"📤 Request fields being sent: {fields}")
+            logger.info(f"📤 Request fields count: {len(fields)}")
+            
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.debug(f"🔗 Sending asset extraction request to {self.base_url}/asset_plate_extract")
                 response = await client.post(
                     f"{self.base_url}/asset_plate_extract",
                     files=files,
                     data=form_data
                 )
             
+            logger.info(f"📡 Response received - Status: {response.status_code}")
+            logger.info(f"📋 Response headers: {dict(response.headers)}")
+            logger.info(f"📄 FULL Response text: {response.text}")
+            logger.info(f"📏 Response length: {len(response.text)} characters")
+            
             if response.status_code == 200:
-                ai_data = response.json()
-                logger.info(f"✅ Asset extraction completed successfully")
-                return ai_data
+                try:
+                    ai_data = response.json()
+                    logger.info(f"✅ Asset extraction completed successfully")
+                    logger.info(f"📊 FULL Response data: {ai_data}")
+                    logger.info(f"📊 Response data type: {type(ai_data)}")
+                    if isinstance(ai_data, dict):
+                        logger.info(f"📊 Response keys: {list(ai_data.keys())}")
+                        logger.info(f"📊 Response key count: {len(ai_data.keys())}")
+                        for key, value in ai_data.items():
+                            logger.info(f"📊 Field '{key}': '{value}' (type: {type(value)})")
+                    return ai_data
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Failed to parse JSON response: {e}")
+                    logger.error(f"📄 Raw response: {response.text}")
+                    raise RuntimeError(f"Invalid JSON response from AI service")
             else:
                 logger.error(f"❌ AI service returned {response.status_code}: {response.text}")
                 raise RuntimeError(f"Asset extraction failed: {response.status_code} - {response.text}")

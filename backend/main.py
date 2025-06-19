@@ -225,8 +225,14 @@ async def extract_asset_plate(file: UploadFile = File(...), input: str = Form(..
         extracted_data = await ai_client.extract_asset_data(contents, file.filename, fields)
         
         logger.info(f"✅ Asset extraction completed with {len(extracted_data)} fields")
-        logger.debug(f"📊 Final extracted data: {extracted_data}")
+        logger.info(f"📊 FINAL extracted data: {extracted_data}")
+        logger.info(f"📊 FINAL data type: {type(extracted_data)}")
+        if isinstance(extracted_data, dict):
+            logger.info(f"📊 FINAL keys: {list(extracted_data.keys())}")
+            for key, value in extracted_data.items():
+                logger.info(f"📊 FINAL field '{key}': '{value}' (type: {type(value)})")
         
+        logger.info(f"🚀 Returning to frontend: {extracted_data}")
         return extracted_data
         
     except HTTPException:
