@@ -48,6 +48,7 @@
   margin-top: 0;
   min-width: 0;
 }
+
 .container {
   width: 90%;
   max-width: 600px;
@@ -370,7 +371,7 @@ button {
 .image-container {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0;
   width: 100%;
 }
 
@@ -378,11 +379,11 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-color);
-  padding: 1.5rem;
-  min-height: 500px;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  padding: 0;
+  min-height: auto;
 }
 
 .image-wrapper img {
@@ -390,6 +391,7 @@ button {
   max-height: 70vh;
   object-fit: contain;
   border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .page-number {
@@ -414,10 +416,15 @@ button {
 
 /* Metadata Panel */
 .metadata-panel {
-  background: white;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-color);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 1.5rem;
+  margin-top: 0;
+  box-shadow: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .metadata-header {
@@ -427,35 +434,42 @@ button {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .metadata-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: var(--text-dark);
+  font-size: 1.3rem;
   font-weight: 600;
+  color: var(--text-dark);
+  margin: 0;
 }
 
-.small-button {
-  background-color: var(--primary);
+.metadata-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-badge {
+  background: var(--success);
   color: white;
-  border: none;
-  border-radius: var(--radius);
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.small-button:hover {
-  background-color: var(--primary-dark);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
 
 .metadata-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
   align-items: start;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .metadata-field {
@@ -494,6 +508,7 @@ button {
   border: 1px solid var(--border-color);
   line-height: 1.4;
   min-height: 1.5rem;
+  word-break: break-word;
 }
 
 .metadata-input {
@@ -1110,12 +1125,15 @@ button {
 
 /* Main Panel Container */
 .metadata-panel {
-  background: white;
-  border-radius: var(--radius);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 1.5rem;
-  margin-top: 1.5rem;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-top: 0;
+  box-shadow: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Panel Header */
@@ -1126,6 +1144,7 @@ button {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .metadata-header h3 {
@@ -1160,6 +1179,8 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
   align-items: start;
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* Individual Field Container */
@@ -1334,10 +1355,32 @@ button {
    RESPONSIVE DESIGN
    =========================================== */
 
+@media (max-width: 1023px) {
+  .image-metadata-container {
+    flex-direction: column;
+  }
+  
+  .metadata-section {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  
+  .metadata-content {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
+  .page-content-card {
+    margin: 0 -1rem 2rem -1rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .image-section,
   .metadata-panel {
     padding: 1rem;
-    margin-top: 1rem;
   }
   
   .metadata-header {
@@ -1345,55 +1388,6 @@ button {
     gap: 1rem;
     text-align: center;
     align-items: center;
-  }
-  
-  .metadata-content {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-  
-  .metadata-field {
-    padding: 0.75rem;
-  }
-  
-  .metadata-value-container p,
-  .metadata-input {
-    padding: 0.6rem;
-    font-size: 0.9rem;
-  }
-  
-  .table-cell {
-    padding: 0.5rem;
-  }
-  
-  .table-input {
-    padding: 0.4rem;
-    font-size: 0.8rem;
-  }
-  
-  .table-row {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-  
-  .table-cell {
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .table-cell:last-child {
-    border-bottom: none;
-  }
-}
-
-@media (min-width: 1024px) {
-  .metadata-content {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-  }
-  
-  .metadata-field:last-child {
-    grid-column: 1 / -1;
   }
 }
 
@@ -1825,5 +1819,207 @@ button {
   .back-button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* NEW: Integrated Card Container for Image + Metadata */
+.page-content-card {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+/* NEW: Unified Image + Metadata Layout - Always Vertical Stack */
+.image-metadata-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+/* Image section - flexible but can shrink */
+.image-section {
+  flex: 1 1 auto;
+  min-height: 200px;
+  max-height: 50vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Metadata section - gets remaining space with minimum */
+.metadata-section {
+  flex: 1 1 auto;
+  min-height: 300px;
+  border-top: 1px solid var(--border-color);
+  border-left: none;
+  overflow-y: auto;
+}
+
+/* Image Section Styling - Updated for horizontal layout */
+.image-section {
+  padding: 1rem;
+  background: var(--bg-lighter);
+  position: relative;
+}
+
+.image-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.image-wrapper img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Metadata Section Styling */
+.metadata-section {
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure metadata panel has proper scroll behavior */
+.metadata-panel {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.small-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.small-button:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Responsive adjustments for all screen sizes */
+@media (max-width: 1023px) {
+  .metadata-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .image-section {
+    max-height: 40vh;
+    min-height: 180px;
+  }
+  
+  .metadata-section {
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-content-card {
+    margin: 0 -1rem 2rem -1rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .image-section {
+    padding: 0.75rem;
+    max-height: 35vh;
+    min-height: 150px;
+  }
+  
+  .metadata-panel {
+    padding: 1rem;
+  }
+  
+  .metadata-section {
+    min-height: 200px;
+  }
+  
+  .metadata-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+    align-items: center;
+  }
+  
+  .image-metadata-container {
+    max-height: 90vh;
+  }
+}
+
+/* Update the container to properly wrap the new layout */
+.image-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* Remove gap since we're using integrated cards */
+  width: 100%;
+}
+
+/* Remove old image-wrapper styling conflicts */
+.image-container .image-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  padding: 0;
+  min-height: auto;
+}
+
+/* Large screen optimizations for vertical layout */
+@media (min-width: 1024px) {
+  .image-metadata-container {
+    max-height: 90vh;
+  }
+  
+  .image-section {
+    max-height: 45vh;
+    min-height: 250px;
+  }
+  
+  .metadata-section {
+    min-height: 350px;
+    flex: 1 1 auto;
+  }
+  
+  .metadata-content {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .image-section {
+    max-height: 50vh;
+    min-height: 300px;
+  }
+  
+  .metadata-section {
+    min-height: 400px;
+  }
+  
+  .metadata-content {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
   }
 }

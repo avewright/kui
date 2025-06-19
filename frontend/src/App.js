@@ -1190,250 +1190,251 @@ function App() {
             {imageResults[currentVisiblePage] !== undefined && (
               <div className="image-container" data-page-index={currentVisiblePage}>
                 {pageLoadingStates[currentVisiblePage] === true ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    padding: '3rem',
-                    minHeight: '400px',
-                    justifyContent: 'center'
-                  }}>
-                    <div className="spinner" style={{ marginBottom: '1rem' }}></div>
-                    <p>Loading page {currentVisiblePage + 1}...</p>
+                  <div className="page-content-card">
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: '3rem',
+                      minHeight: '400px',
+                      justifyContent: 'center'
+                    }}>
+                      <div className="spinner" style={{ marginBottom: '1rem' }}></div>
+                      <p>Loading page {currentVisiblePage + 1}...</p>
+                    </div>
                   </div>
                 ) : pageLoadingStates[currentVisiblePage] === 'error' ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    padding: '3rem',
-                    minHeight: '400px',
-                    justifyContent: 'center',
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    borderRadius: 'var(--radius)'
-                  }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '1rem' }}>
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                    <p style={{ color: 'var(--danger)' }}>Failed to load page {currentVisiblePage + 1}</p>
-                    <button 
-                      className="small-button" 
-                      onClick={() => {
-                        setPageLoadingStates(prev => {
-                          const updated = [...prev];
-                          updated[currentVisiblePage] = true;
-                          return updated;
-                        });
-                        fetchPageImage(pdfInfo.pdf_id, currentVisiblePage)
-                          .then(pageData => {
-                            setImageResults(prev => {
-                              const updated = [...prev];
-                              updated[currentVisiblePage] = pageData.image;
-                              return updated;
-                            });
-                            setPageLoadingStates(prev => {
-                              const updated = [...prev];
-                              updated[currentVisiblePage] = false;
-                              return updated;
-                            });
-                          })
-                          .catch(() => {
-                            setPageLoadingStates(prev => {
-                              const updated = [...prev];
-                              updated[currentVisiblePage] = 'error';
-                              return updated;
-                            });
+                  <div className="page-content-card">
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: '3rem',
+                      minHeight: '400px',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(231, 76, 60, 0.1)'
+                    }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '1rem' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                      <p style={{ color: 'var(--danger)' }}>Failed to load page {currentVisiblePage + 1}</p>
+                      <button 
+                        className="small-button" 
+                        onClick={() => {
+                          setPageLoadingStates(prev => {
+                            const updated = [...prev];
+                            updated[currentVisiblePage] = true;
+                            return updated;
                           });
-                      }}
-                    >
-                      Retry
-                    </button>
+                          fetchPageImage(pdfInfo.pdf_id, currentVisiblePage)
+                            .then(pageData => {
+                              setImageResults(prev => {
+                                const updated = [...prev];
+                                updated[currentVisiblePage] = pageData.image;
+                                return updated;
+                              });
+                              setPageLoadingStates(prev => {
+                                const updated = [...prev];
+                                updated[currentVisiblePage] = false;
+                                return updated;
+                              });
+                            })
+                            .catch(() => {
+                              setPageLoadingStates(prev => {
+                                const updated = [...prev];
+                                updated[currentVisiblePage] = 'error';
+                                return updated;
+                              });
+                            });
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
                   </div>
                 ) : imageResults[currentVisiblePage] ? (
-                  <>
-                    <div className="image-wrapper">
-                      <img 
-                        src={`data:image/png;base64,${imageResults[currentVisiblePage]}`} 
-                        alt={`Page ${currentVisiblePage + 1}`}
-                        loading="lazy"
-                        style={{
-                          width: '100%',
-                          objectFit: 'contain'
-                        }}
-                      />
-                    </div>
-                    
-                    {metadata[currentVisiblePage] && (
-                      <div className="metadata-panel">
-                        <div className="metadata-header">
-                          <h3>
-                            {metadata[currentVisiblePage]?.type === 'asset' ? 'Asset Information' : 'Drawing Metadata'}
-                          </h3>
-                          <div className="header-actions">
-                            {metadata[currentVisiblePage]?.type === 'asset' && (
-                              <div className="status-badge">
-                                ✓ {metadata[currentVisiblePage]?.isAiGenerated ? 'AI Extracted' : 'Manual Entry'}
-                              </div>
-                            )}
-                            {editingIndex === currentVisiblePage ? (
-                              <button className="small-button" onClick={stopEditing}>Done</button>
-                            ) : (
-                              <button className="small-button" onClick={() => startEditing(currentVisiblePage)}>Edit</button>
-                            )}
-                          </div>
+                  <div className="page-content-card">
+                    <div className="image-metadata-container">
+                      <div className="image-section">
+                        <div className="image-wrapper">
+                          <img 
+                            src={`data:image/png;base64,${imageResults[currentVisiblePage]}`} 
+                            alt={`Page ${currentVisiblePage + 1}`}
+                            loading="lazy"
+                          />
                         </div>
-                        
-                        {metadata[currentVisiblePage]?.type === 'asset' ? (
-                          <div className="metadata-content">
-                            {Object.entries(metadata[currentVisiblePage]?.fields || {}).map(([key, value]) => (
-                              <div key={key} className="metadata-field">
-                                <label>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                      </div>
+                      
+                      {metadata[currentVisiblePage] && (
+                        <div className="metadata-section">
+                          <div className="metadata-panel">
+                            <div className="metadata-header">
+                              <h3>
+                                {metadata[currentVisiblePage]?.type === 'asset' ? 'Asset Information' : 'Drawing Metadata'}
+                              </h3>
+                              <div className="header-actions">
+                                {metadata[currentVisiblePage]?.type === 'asset' && (
+                                  <div className="status-badge">
+                                    ✓ {metadata[currentVisiblePage]?.isAiGenerated ? 'AI Extracted' : 'Manual Entry'}
+                                  </div>
+                                )}
                                 {editingIndex === currentVisiblePage ? (
-                                  <input
-                                    type="text"
-                                    value={value || ''}
-                                    onChange={(e) => handleAssetFieldEdit(currentVisiblePage, key, e.target.value)}
-                                    className="metadata-input"
-                                    placeholder={`Enter ${key.replace(/_/g, ' ').toLowerCase()}...`}
-                                  />
+                                  <button className="small-button" onClick={stopEditing}>Done</button>
                                 ) : (
-                                  <div className="metadata-value-container">
-                                    <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                      {value || 'Not detected'}
-                                    </p>
+                                  <button className="small-button" onClick={() => startEditing(currentVisiblePage)}>Edit</button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {metadata[currentVisiblePage]?.type === 'asset' ? (
+                              <div className="metadata-content">
+                                {Object.entries(metadata[currentVisiblePage]?.fields || {}).map(([key, value]) => (
+                                  <div key={key} className="metadata-field">
+                                    <label>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                                    {editingIndex === currentVisiblePage ? (
+                                      <input
+                                        type="text"
+                                        value={value || ''}
+                                        onChange={(e) => handleAssetFieldEdit(currentVisiblePage, key, e.target.value)}
+                                        className="metadata-input"
+                                        placeholder={`Enter ${key.replace(/_/g, ' ').toLowerCase()}...`}
+                                      />
+                                    ) : (
+                                      <div className="metadata-value-container">
+                                        <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                          {value || 'Not detected'}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {(!metadata[currentVisiblePage]?.fields || Object.keys(metadata[currentVisiblePage].fields).length === 0) && (
+                                  <div className="no-data-message">
+                                    <p>No asset information was extracted from this image.</p>
                                   </div>
                                 )}
                               </div>
-                            ))}
-                            {(!metadata[currentVisiblePage]?.fields || Object.keys(metadata[currentVisiblePage].fields).length === 0) && (
-                              <div className="no-data-message">
-                                <p>No asset information was extracted from this image.</p>
+                            ) : (
+                              <div className="metadata-content">
+                                <div className="metadata-field">
+                                  <label>Title</label>
+                                  {editingIndex === currentVisiblePage ? (
+                                    <input
+                                      type="text"
+                                      value={metadata[currentVisiblePage]?.title || ''}
+                                      onChange={(e) => handleMetadataEdit(currentVisiblePage, 'title', e.target.value)}
+                                      className="metadata-input"
+                                    />
+                                  ) : (
+                                    <div className="metadata-value-container">
+                                      <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                        {metadata[currentVisiblePage]?.title || ''}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="metadata-field">
+                                  <label>Drawing Number</label>
+                                  {editingIndex === currentVisiblePage ? (
+                                    <input
+                                      type="text"
+                                      value={metadata[currentVisiblePage]?.drawingNumber || ''}
+                                      onChange={(e) => handleMetadataEdit(currentVisiblePage, 'drawingNumber', e.target.value)}
+                                      className="metadata-input"
+                                    />
+                                  ) : (
+                                    <div className="metadata-value-container">
+                                      <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
+                                        {metadata[currentVisiblePage]?.drawingNumber || ''}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="metadata-field">
+                                  <label>Revisions</label>
+                                  {editingIndex === currentVisiblePage ? (
+                                    <div className="revision-table">
+                                      <div className="revision-row">
+                                        <div className="revision-cell table-header">ID</div>
+                                        <div className="revision-cell table-header">Description</div>
+                                        <div className="revision-cell table-header">Date</div>
+                                        <div className="revision-cell table-header">Actions</div>
+                                      </div>
+                                      {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
+                                        <div key={revisionIndex} className="revision-row">
+                                          <div className="revision-cell">
+                                            <input
+                                              type="text"
+                                              value={revision.id}
+                                              onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'id', e.target.value)}
+                                              className="revision-input"
+                                            />
+                                          </div>
+                                          <div className="revision-cell">
+                                            <input
+                                              type="text"
+                                              value={revision.description}
+                                              onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'description', e.target.value)}
+                                              className="revision-input"
+                                            />
+                                          </div>
+                                          <div className="revision-cell">
+                                            <input
+                                              type="date"
+                                              value={revision.date}
+                                              onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'date', e.target.value)}
+                                              className="revision-input"
+                                            />
+                                          </div>
+                                          <div className="revision-cell">
+                                            <button 
+                                              className="small-button" 
+                                              style={{ backgroundColor: 'var(--danger)' }}
+                                              onClick={() => removeRevisionRow(currentVisiblePage, revisionIndex)}
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <div className="revision-actions" style={{ marginTop: '0.5rem' }}>
+                                        <button className="small-button" onClick={() => addRevisionRow(currentVisiblePage)}>Add Revision</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="revision-table">
+                                      <div className="revision-row">
+                                        <div className="revision-cell table-header">ID</div>
+                                        <div className="revision-cell table-header">Description</div>
+                                        <div className="revision-cell table-header">Date</div>
+                                      </div>
+                                      {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
+                                        <div key={revisionIndex} className="revision-row">
+                                          <div className="revision-cell">
+                                            <p>{revision.id}</p>
+                                          </div>
+                                          <div className="revision-cell">
+                                            <p>{revision.description}</p>
+                                          </div>
+                                          <div className="revision-cell">
+                                            <p>{revision.date}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="metadata-content">
-                            <div className="metadata-field">
-                              <label>Title</label>
-                              {editingIndex === currentVisiblePage ? (
-                                <input
-                                  type="text"
-                                  value={metadata[currentVisiblePage]?.title || ''}
-                                  onChange={(e) => handleMetadataEdit(currentVisiblePage, 'title', e.target.value)}
-                                  className="metadata-input"
-                                />
-                              ) : (
-                                <div className="metadata-value-container">
-                                  <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                    {metadata[currentVisiblePage]?.title || ''}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="metadata-field">
-                              <label>Drawing Number</label>
-                              {editingIndex === currentVisiblePage ? (
-                                <input
-                                  type="text"
-                                  value={metadata[currentVisiblePage]?.drawingNumber || ''}
-                                  onChange={(e) => handleMetadataEdit(currentVisiblePage, 'drawingNumber', e.target.value)}
-                                  className="metadata-input"
-                                />
-                              ) : (
-                                <div className="metadata-value-container">
-                                  <p className={metadata[currentVisiblePage]?.isEdited ? 'edited-value' : ''}>
-                                    {metadata[currentVisiblePage]?.drawingNumber || ''}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="metadata-field">
-                              <label>Revisions</label>
-                              {editingIndex === currentVisiblePage ? (
-                                <div className="revision-table">
-                                  <div className="revision-row">
-                                    <div className="revision-cell table-header">ID</div>
-                                    <div className="revision-cell table-header">Description</div>
-                                    <div className="revision-cell table-header">Date</div>
-                                    <div className="revision-cell table-header">Actions</div>
-                                  </div>
-                                  {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
-                                    <div key={revisionIndex} className="revision-row">
-                                      <div className="revision-cell">
-                                        <input
-                                          type="text"
-                                          value={revision.id}
-                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'id', e.target.value)}
-                                          className="revision-input"
-                                        />
-                                      </div>
-                                      <div className="revision-cell">
-                                        <input
-                                          type="text"
-                                          value={revision.description}
-                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'description', e.target.value)}
-                                          className="revision-input"
-                                        />
-                                      </div>
-                                      <div className="revision-cell">
-                                        <input
-                                          type="date"
-                                          value={revision.date}
-                                          onChange={(e) => handleRevisionEdit(currentVisiblePage, revisionIndex, 'date', e.target.value)}
-                                          className="revision-input"
-                                        />
-                                      </div>
-                                      <div className="revision-cell">
-                                        <button 
-                                          className="small-button" 
-                                          style={{ backgroundColor: 'var(--danger)' }}
-                                          onClick={() => removeRevisionRow(currentVisiblePage, revisionIndex)}
-                                        >
-                                          Remove
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <div className="revision-actions" style={{ marginTop: '0.5rem' }}>
-                                    <button className="small-button" onClick={() => addRevisionRow(currentVisiblePage)}>Add Revision</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="revision-table">
-                                  <div className="revision-row">
-                                    <div className="revision-cell table-header">ID</div>
-                                    <div className="revision-cell table-header">Description</div>
-                                    <div className="revision-cell table-header">Date</div>
-                                  </div>
-                                  {metadata[currentVisiblePage].revisions.map((revision, revisionIndex) => (
-                                    <div key={revisionIndex} className="revision-row">
-                                      <div className="revision-cell">
-                                        <p>{revision.id}</p>
-                                      </div>
-                                      <div className="revision-cell">
-                                        <p>{revision.description}</p>
-                                      </div>
-                                      <div className="revision-cell">
-                                        <p>{revision.date}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* <p className="page-number">
-                      Page {currentVisiblePage + 1}
-                    </p> */}
-                  </>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : null}
               </div>
             )}
